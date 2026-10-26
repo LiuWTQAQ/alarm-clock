@@ -257,3 +257,36 @@ PlatformIO 内置板定义默认 N8；需自定义 `boards/` 定义或用 `board
 ---
 
 © 2026 刘文涛 · 西南交通大学—利兹学院 · 指导教师：黄慧萍
+
+## 网页配置（不用重新烧写）
+
+设备连上 Wi-Fi 后自带一个配置页，电脑/手机与闹钟在同一局域网即可打开：
+
+```
+http://192.168.31.173/          # 串口日志里会打印实际 IP
+http://alarm.local/             # mDNS 名字（部分路由器不转发 .local，用 IP 更稳）
+```
+
+页面上能做两件事：
+
+| 操作 | 存储位置 | 生效方式 |
+|---|---|---|
+| 选择天气城市（40 个城市） | NVS `cfg/city` | 保存后立刻按新经纬度拉取天气 |
+| 上传背景图（JPEG） | LittleFS `/bg.jpg` | 上传完成立即重绘，重启后仍在 |
+
+约束：背景图只接受 JPEG（ESP32 上没有 PNG 解码器），建议 320×240 或其整数倍；
+绘制时会按比例自动降采样并压暗 50%，保证时间/文字可读。
+
+相关源码：`src/core/settings.cpp`（城市表 + NVS）、`src/net/webcfg.cpp`（HTTP 服务与上传）、
+`src/ui/ui.cpp` 里的 `drawBgImg()`（TJpg_Decoder 解码 + 压暗 + 上屏）。
+
+## 分区表
+
+`partitions.csv` 把 8 MB Flash 划成：app 3 MB + LittleFS 960 KB（`spiffs` 标签）。
+改动过分区表后，第一次烧录前建议先 `pio run -t erase`，否则旧的文件系统数据可能对不上。
+
+## 字体
+
+屏上中文来自 `include/ui_font_cn.h`（点阵字库，由 `tools/gen_cnfont.py` 从 macOS 自带的
+华文黑体 Medium 生成，三档 28/18/15 px）。之所以不用微软雅黑：15 px 下雅黑笔画太细，
+二值化后会断笔；华文黑体 Medium 的笔画更均匀，在 1-bit 点阵下更清楚。

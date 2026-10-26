@@ -1,0 +1,172 @@
+#include "weather.h"
+#include <Arduino.h>
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+#include "config.h"
+#include "settings.h"
+
+namespace weather {
+namespace {
+
+struct Entry { int code; const char* text; };
+const Entry kMap[] = {
+  {0, "晴"},    {1, "晴"},     {2, "多云"},  {3, "阴"},
+  {45, "雾"},   {48, "雾"},
+  {51, "小雨"}, {53, "小雨"},  {55, "小雨"},
+  {56, "冻雨"}, {57, "冻雨"},
+  {61, "小雨"}, {63, "中雨"},  {65, "大雨"},
+  {66, "冻雨"}, {67, "冻雨"},
+  {71, "小雪"}, {73, "中雪"},  {75, "大雪"}, {77, "小雪"},
+  {80, "阵雨"}, {81, "阵雨"},  {82, "暴雨"},
+  {85, "阵雪"}, {86, "阵雪"},
+  {95, "雷雨"}, {96, "雷雨"},  {99, "雷雨"},
+};
+
+int      s_temp  = -1;
+int      s_code  = -1;
+const char* s_cond = "获取中";
+int      s_aqi   = -1;
+int      s_pm25  = -1;
+int      s_pm10  = -1;
+bool     s_valid = false;
+uint32_t s_next  = 0;
+
+float jsonNumber(const String& body, const char* key, int from) {
+  int i = body.indexOf(key, from);
+  if (i < 0) return NAN;
+  i = body.indexOf(':', i);
+  if (i < 0) return NAN;
+  return body.substring(i + 1).toFloat();
+}
+
+const char* codeToText(int code) {
+  for (const Entry& e : kMap)
+    if (e.code == code) return e.text;
+  return "多云";
+}
+
+// haze and dust are not WMO codes: derive them from particulate readings
+void applyCond() {
+  if (s_code < 0) { s_cond = "获取中"; return; }
+  bool clearSky = (s_code <= 3);
+  if (clearSky && s_pm10 > 300)      { s_cond = "沙尘"; return; }
+  if (clearSky && s_pm25 > 75)       { s_cond = "霾";   return; }
+  s_cond = codeToText(s_code);
+}
+
+bool fetchWeather() {
+  WiFiClientSecure client;
+  client.setInsecure();
+  HTTPClient http;
+
+  char url[240];
+  snprintf(url, sizeof(url),
+           "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
+           "&current=temperature_2m,weather_code&timezone=Asia%%2FShanghai",
+           (double)settings::lat(), (double)settings::lon());
+
+  if (!http.begin(client, url)) { Serial.println("[wx] begin failed"); return false; }
+  http.setTimeout(8000);
+  int httpCode = http.GET();
+  if (httpCode != 200) {
+    Serial.printf("[wx] http %d\n", httpCode);
+    http.end();
+    return false;
+  }
+  String body = http.getString();
+  http.end();
+
+  int cur = body.indexOf("\"current\":");
+  if (cur < 0) { Serial.println("[wx] no current block"); return false; }
+  float t = jsonNumber(body, "\"temperature_2m\"", cur);
+  float c = jsonNumber(body, "\"weather_code\"", cur);
+  if (isnan(t) || isnan(c)) { Serial.println("[wx] parse failed"); return false; }
+
+  s_temp = (int)lroundf(t);
+  s_code = (int)c;
+  return true;
+}
+
+bool fetchAqi() {
+  WiFiClientSecure client;
+  client.setInsecure();
+  HTTPClient http;
+
+  char url[260];
+  snprintf(url, sizeof(url),
+           "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=%.4f&longitude=%.4f"
+           "&current=us_aqi,pm2_5,pm10&timezone=Asia%%2FShanghai",
+           (double)settings::lat(), (double)settings::lon());
+
+  if (!http.begin(client, url)) { Serial.println("[aqi] begin failed"); return false; }
+  http.setTimeout(8000);
+  int httpCode = http.GET();
+  if (httpCode != 200) {
+    Serial.printf("[aqi] http %d\n", httpCode);
+    http.end();
+    return false;
+  }
+  String body = http.getString();
+  http.end();
+
+  int cur = body.indexOf("\"current\":");
+  if (cur < 0) { Serial.println("[aqi] no current block"); return false; }
+
+  float a  = jsonNumber(body, "\"us_aqi\"", cur);
+  float p2 = jsonNumber(body, "\"pm2_5\"", cur);
+  float p10 = jsonNumber(body, "\"pm10\"", cur);
+  if (isnan(a)) { Serial.println("[aqi] parse failed"); return false; }
+
+  s_aqi  = (int)lroundf(a);
+  s_pm25 = isnan(p2) ? -1 : (int)lroundf(p2);
+  s_pm10 = isnan(p10) ? -1 : (int)lroundf(p10);
+  return true;
+}
+
+}  // namespace
+
+void begin() { s_next = millis() + 2000; }
+
+void restart() {
+  s_valid = false;
+  s_aqi   = -1;
+  s_next  = millis() + 500;
+  Serial.println("[wx] restart for new city");
+}
+
+void loop() {
+  if (WiFi.status() != WL_CONNECTED) { s_next = millis() + 3000; return; }
+  if ((int32_t)(millis() - s_next) < 0) return;
+
+  bool okWx  = fetchWeather();
+  bool okAqi = fetchAqi();
+  bool ok    = okWx || okAqi;
+
+  if (okWx) {
+    applyCond();
+    s_valid = true;
+  }
+  s_next = millis() + (ok ? WEATHER_REFRESH_MS : 60000UL);
+
+  Serial.printf("[wx] %s  %s  %d C  %s | aqi %d %s  pm2.5 %d  pm10 %d\n",
+                ok ? "ok" : "fail", settings::cityName(), s_temp, s_cond,
+                s_aqi, aqiText(), s_pm25, s_pm10);
+}
+
+bool valid()        { return s_valid; }
+int  tempC()        { return s_temp; }
+const char* cond()  { return s_cond; }
+int  aqi()          { return s_aqi; }
+
+const char* aqiText() {
+  if (s_aqi < 0)   return "";
+  if (s_aqi <= 50)  return "优";
+  if (s_aqi <= 100) return "良";
+  if (s_aqi <= 150) return "轻度";
+  if (s_aqi <= 200) return "中度";
+  if (s_aqi <= 300) return "重度";
+  return "严重";
+}
+
+}  // namespace weather

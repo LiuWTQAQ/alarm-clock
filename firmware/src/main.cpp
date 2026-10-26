@@ -1,45 +1,65 @@
+// alarm-clock: composition root (init order + scheduling only)
 #include <Arduino.h>
-#include <SPI.h>
-#include <TFT_eSPI.h>
-
-TFT_eSPI tft = TFT_eSPI();
+#include <string.h>
+#include "config.h"
+#include "ui/ui.h"
+#include "net/net_time.h"
+#include "net/weather.h"
+#include "net/webcfg.h"
+#include "settings.h"
 
 void setup() {
   Serial.begin(115200);
-  delay(800);
-  Serial.println("\n[probe] ---------- 配置检查 ----------");
-#ifdef TFT_CS
-  Serial.printf("[probe] TFT_CS   = %d\n", TFT_CS);
-  Serial.printf("[probe] TFT_DC   = %d\n", TFT_DC);
-  Serial.printf("[probe] TFT_RST  = %d\n", TFT_RST);
-  Serial.printf("[probe] TFT_MOSI = %d\n", TFT_MOSI);
-  Serial.printf("[probe] TFT_SCLK = %d\n", TFT_SCLK);
-  Serial.printf("[probe] SPI_FREQ = %d\n", SPI_FREQUENCY);
-#else
-  Serial.println("[probe] TFT_CS 未定义 → build_flags 没生效！");
-#endif
+  delay(300);
+  settings::begin();
+  Serial.printf("\n=== alarm-clock ===  city=%s\n", settings::cityName());
 
-  tft.init();
-  Serial.println("[probe] init 完成");
+  ui::begin();              // screen first, so we have feedback even without Wi-Fi
+  ui::setCity(settings::cityName());
 
-  // 慢速、逐色刷屏：如果颜色能变，说明 SPI 数据通路是通的
-  for (int i = 0; i < 3; i++) {
-    tft.fillScreen(i == 0 ? TFT_RED : (i == 1 ? TFT_GREEN : TFT_BLUE));
-    Serial.printf("[probe] fill %s\n", i == 0 ? "RED" : (i == 1 ? "GREEN" : "BLUE"));
-    delay(1200);
-  }
-
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.setTextDatum(TL_DATUM);
-  tft.drawString("SPI OK", 20, 40, 4);
-  Serial.println("[probe] 文字已发送");
+  net_time::begin();        // Wi-Fi + SNTP
+  weather::begin();         // first fetch ~2 s after boot
 }
 
 void loop() {
-  static uint32_t t = 0;
-  if (millis() - t > 2000) {
-    t = millis();
-    Serial.println("[probe] alive");
+  net_time::loop();
+  weather::loop();
+  if (net_time::connected() && !webcfg::started()) webcfg::begin();
+  if (webcfg::started()) webcfg::loop();
+  ui::loop();
+
+  // Wi-Fi state -> header + bottom line
+  static bool lastUp = false;
+  static int  lastRssi = 0;
+  bool up = net_time::connected();
+  int  rssi = net_time::rssi();
+  if (up != lastUp || rssi != lastRssi) {
+    lastUp = up; lastRssi = rssi;
+    ui::setWifi(up, rssi);
+  }
+
+  // clock, once per second
+  static int lastSec = -1;
+  struct tm t;
+  if (net_time::localTime(t) && t.tm_sec != lastSec) {
+    lastSec = t.tm_sec;
+    ui::tick(t);
+  }
+
+  // weather, only when it actually changes
+  static int  lastTemp = -999;
+  static int  lastAqi  = -999;
+  static char lastCond[16] = "";
+  if (weather::valid() &&
+      (weather::tempC() != lastTemp || strcmp(lastCond, weather::cond()) != 0)) {
+    lastTemp = weather::tempC();
+    strncpy(lastCond, weather::cond(), sizeof(lastCond) - 1);
+    lastCond[sizeof(lastCond) - 1] = 0;
+    ui::setWeather(lastTemp, lastCond);
+    Serial.printf("[ui] weather %d C %s\n", lastTemp, lastCond);
+  }
+  if (weather::aqi() != lastAqi) {
+    lastAqi = weather::aqi();
+    ui::setAqi(lastAqi, weather::aqiText());
   }
 }

@@ -1,0 +1,88 @@
+#include "net_time.h"
+#include <Arduino.h>
+#include <WiFi.h>
+#include <time.h>
+#include "secrets.h"
+
+namespace {
+
+enum State { S_WIFI, S_TIME, S_OK };
+State    s_state    = S_WIFI;
+uint32_t s_lastTry  = 0;
+uint32_t s_lastSync = 0;
+
+const char* kNtp[3] = {"ntp.aliyun.com", "ntp.tencent.com", "cn.pool.ntp.org"};
+const char* kTz     = "CST-8";                 // Asia/Shanghai, no DST
+
+void startSntp() {
+  configTzTime(kTz, kNtp[0], kNtp[1], kNtp[2]);
+}
+
+bool haveSaneTime() {
+  struct tm t;
+  if (!getLocalTime(&t, 0)) return false;
+  return t.tm_year > 120;                      // > 2020
+}
+
+}  // namespace
+
+void net_time::begin() {
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.setSleep(false);                        // keeps SPI/TFT timing stable
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  s_lastTry = millis();
+  Serial.printf("[net] connecting to %s\n", WIFI_SSID);
+}
+
+void net_time::loop() {
+  uint32_t now = millis();
+
+  switch (s_state) {
+    case S_WIFI:
+      if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("[net] wifi ok  ip=%s  rssi=%d\n",
+                      WiFi.localIP().toString().c_str(), WiFi.RSSI());
+        startSntp();
+        s_lastSync = now;
+        s_state = S_TIME;
+      } else if (now - s_lastTry > 15000) {
+        s_lastTry = now;
+        Serial.println("[net] retry wifi");
+        WiFi.disconnect();
+        WiFi.begin(WIFI_SSID, WIFI_PASS);
+      }
+      break;
+
+    case S_TIME:
+      if (haveSaneTime()) {
+        s_state = S_OK;
+        Serial.println("[net] time synced");
+      } else if (now - s_lastSync > 20000) {
+        Serial.println("[net] sntp retry");
+        startSntp();
+        s_lastSync = now;
+      }
+      break;
+
+    case S_OK:
+      if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("[net] wifi lost");
+        s_state = S_WIFI;
+        s_lastTry = now;
+      } else if (now - s_lastSync > 6UL * 3600UL * 1000UL) {
+        startSntp();                           // resync every 6 h
+        s_lastSync = now;
+      }
+      break;
+  }
+}
+
+bool net_time::connected() { return WiFi.status() == WL_CONNECTED; }
+bool net_time::timeOk()    { return s_state == S_OK; }
+int  net_time::rssi()      { return connected() ? WiFi.RSSI() : 0; }
+
+bool net_time::localTime(struct tm& out) {
+  return getLocalTime(&out, 0) && out.tm_year > 120;
+}

@@ -1,6 +1,4 @@
 #pragma once
-#define WIFI_SSID     "your-ssid"
-#define WIFI_PASS     "your-pass"
-#define MQTT_HOST     "your-server-ip"
-#define MQTT_USER     "alarm"
-#define MQTT_PASS     "your-mqtt-pass"
+// copy to include/secrets.h (already in .gitignore) and fill in
+#define WIFI_SSID "your-2.4g-ssid"
+#define WIFI_PASS "your-password"
