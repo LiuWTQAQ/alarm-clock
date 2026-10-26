@@ -20,4 +20,10 @@ const char* cityName();
 float       lat();
 float       lon();
 
+// Display preferences (settings page writes these)
+bool        hour12();
+void        setHour12(bool v);
+uint8_t     lang();          // 0 = Chinese, 1 = English
+void        setLang(uint8_t v);
+
 }  // namespace settings

@@ -50,12 +50,16 @@ const City kCities[] = {
 const int    kN = (int)(sizeof(kCities) / sizeof(kCities[0]));
 Preferences  prefs;
 int          s_idx = 0;
+bool         s_hour12 = false;
+uint8_t      s_lang   = 0;
 
 }  // namespace
 
 void begin() {
   prefs.begin("cfg", true);
   int i = prefs.getInt("city", 0);
+  s_hour12 = prefs.getBool("h12", false);
+  s_lang   = prefs.getUChar("lang", 0);
   prefs.end();
   s_idx = (i >= 0 && i < kN) ? i : 0;
 }
@@ -73,6 +77,17 @@ void setCityIndex(int i) {
 }
 
 const char* cityName()        { return kCities[s_idx].name; }
+
+bool hour12()          { return s_hour12; }
+void setHour12(bool v) {
+  s_hour12 = v;
+  prefs.begin("cfg", false); prefs.putBool("h12", v); prefs.end();
+}
+uint8_t lang()         { return s_lang; }
+void setLang(uint8_t v) {
+  s_lang = v ? 1 : 0;
+  prefs.begin("cfg", false); prefs.putUChar("lang", s_lang); prefs.end();
+}
 float       lat()             { return kCities[s_idx].lat; }
 float       lon()             { return kCities[s_idx].lon; }
 

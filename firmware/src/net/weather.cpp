@@ -25,6 +25,7 @@ const Entry kMap[] = {
 };
 
 int      s_temp  = -1;
+unsigned long s_lastUpdate = 0;
 int      s_app   = -1;
 int      s_hum   = -1;
 int      s_dayCode[3] = {-1, -1, -1};
@@ -170,6 +171,7 @@ void loop() {
   if (okWx) {
     applyCond();
     s_valid = true;
+  s_lastUpdate = millis();
   }
   s_next = millis() + (ok ? WEATHER_REFRESH_MS : 60000UL);
 
@@ -179,6 +181,7 @@ void loop() {
 }
 
 bool valid()        { return s_valid; }
+unsigned long lastUpdate() { return s_lastUpdate; }
 int  tempC()        { return s_temp; }
 const char* cond()  { return s_cond; }
 int  aqi()          { return s_aqi; }

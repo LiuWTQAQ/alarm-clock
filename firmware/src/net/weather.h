@@ -4,6 +4,7 @@ void begin();
 void restart();       // city changed: refetch immediately
 void loop();          // blocking HTTPS GET, ~2-4 s, every 30 min
 bool valid();
+unsigned long lastUpdate();   // millis() of the last successful fetch, 0 = never
 int  tempC();
 const char* cond();   // "晴" / "多云" / "小雨" / "霾" / "沙尘" ...
 int  aqi();           // US AQI, -1 = unknown

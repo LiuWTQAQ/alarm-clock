@@ -32,6 +32,11 @@ static void debugKeys() {
   case 'c': ui::tap(80, 185);  break;   // home -> smart home
   case 'e': ui::tap(40, 50);   break;   // list -> edit first alarm
   case 'b': ui::back();        break;   // back to home
+  case 's': ui::tap(240, 187); break;   // home -> settings
+  case 't': ui::tap(160, 54);  break;   // toggle 12/24 h
+  case 'l': ui::tap(160, 104); break;   // toggle language
+  case 'p': ui::debugDumpClock(); break;  // dump clock sprite
+  case 'q': ui::debugDumpScreen(); break; // dump clock area from panel
   default: break;
   }
 }
