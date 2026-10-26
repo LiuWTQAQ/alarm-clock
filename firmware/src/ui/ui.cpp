@@ -115,7 +115,22 @@ int cnWidth(const CnFont& f, const char* s) {
   return w;
 }
 
-void cnDraw(const CnFont& f, const char* s, int x, int yTop, uint16_t color) {
+inline uint16_t blend565(uint16_t bg, uint16_t fg, uint8_t a) {
+  if (a == 0)  return bg;
+  if (a == 15) return fg;
+  int rb = (bg >> 11) & 0x1F, gb = (bg >> 5) & 0x3F, bb = bg & 0x1F;
+  int rf = (fg >> 11) & 0x1F, gf = (fg >> 5) & 0x3F, bf = fg & 0x1F;
+  int r = rb + ((rf - rb) * a) / 15;
+  int g = gb + ((gf - gb) * a) / 15;
+  int b = bb + ((bf - bb) * a) / 15;
+  return (uint16_t)((r << 11) | (g << 5) | b);
+}
+
+// 4-bit antialiased blit. `base` is the colour already on screen behind the
+// text; every coverage level is blended against it, which is what makes the
+// edges smooth instead of stair-stepped.
+void cnDrawTo(TFT_eSPI& dst, const CnFont& f, const char* s, int x, int yTop,
+              uint16_t color, uint16_t base) {
   const char* p = s;
   int pen = x;
   while (*p) {
@@ -123,16 +138,14 @@ void cnDraw(const CnFont& f, const char* s, int x, int yTop, uint16_t color) {
     if (!g) { pen += f.ascent / 2; continue; }
     if (g->w && g->h) {
       int ox = pen + g->xoff, oy = yTop + g->yoff;
-      int rb = (g->w + 7) / 8;
+      int rb = (g->w + 1) / 2;
       for (int row = 0; row < g->h; row++) {
         const uint8_t* line = f.data + g->off + row * rb;
-        int c = 0;
-        while (c < g->w) {
-          if (line[c >> 3] & (0x80 >> (c & 7))) {
-            int start = c;
-            while (c < g->w && (line[c >> 3] & (0x80 >> (c & 7)))) c++;
-            tft.drawFastHLine(ox + start, oy + row, c - start, color);
-          } else c++;
+        for (int c = 0; c < g->w; c++) {
+          uint8_t b = line[c >> 1];
+          uint8_t a = (c & 1) ? (b & 0x0F) : (b >> 4);
+          if (!a) continue;
+          dst.drawPixel(ox + c, oy + row, blend565(base, color, a));
         }
       }
     }
@@ -140,13 +153,17 @@ void cnDraw(const CnFont& f, const char* s, int x, int yTop, uint16_t color) {
   }
 }
 
-void textS(const CnFont& f, const char* s, int x, int y, uint16_t color) {
-  if (s_hasBg) cnDraw(f, s, x + 1, y + 1, TFT_BLACK);
-  cnDraw(f, s, x, y, color);
+void cnDraw(const CnFont& f, const char* s, int x, int yTop, uint16_t color, uint16_t base = C_BG) {
+  cnDrawTo(tft, f, s, x, yTop, color, base);
 }
 
-void textC(const CnFont& f, const char* s, int cx, int yTop, uint16_t color) {
-  cnDraw(f, s, cx - cnWidth(f, s) / 2, yTop, color);
+void textS(const CnFont& f, const char* s, int x, int y, uint16_t color, uint16_t base = C_BG) {
+  if (s_hasBg) cnDraw(f, s, x + 1, y + 1, TFT_BLACK, base);
+  cnDraw(f, s, x, y, color, base);
+}
+
+void textC(const CnFont& f, const char* s, int cx, int yTop, uint16_t color, uint16_t base = C_BG) {
+  cnDraw(f, s, cx - cnWidth(f, s) / 2, yTop, color, base);
 }
 
 void dimBand(int x, int y, int w, int h) {
@@ -163,7 +180,7 @@ bool inR(int x, int y, int rx, int ry, int rw, int rh) {
 void pill(int x, int y, int w, int h, const char* label,
           uint16_t bg, uint16_t fg, const CnFont& f) {
   tft.fillRoundRect(x, y, w, h, 6, bg);
-  cnDraw(f, label, x + (w - cnWidth(f, label)) / 2, y + (h - f.ascent) / 2 + 1, fg);
+  cnDraw(f, label, x + (w - cnWidth(f, label)) / 2, y + (h - f.ascent) / 2 + 1, fg, bg);
 }
 
 // ---------- icons ----------
@@ -307,24 +324,29 @@ void drawHomeHeader() {
 }
 
 void paintTime() {
-  char buf[12];
+  char buf[16];
   if (!s_timeOk) snprintf(buf, sizeof(buf), "--:--:--");
   else           snprintf(buf, sizeof(buf), "%02d:%02d:%02d", s_h, s_m, s_s);
 
+  int tw = cnWidth(cn64, buf);
+  int w  = tw + 8;
+  if (w > 316) w = 316;
+
   if (s_hasBg || !s_timeBox) {
-    tft.setTextDatum(MC_DATUM);
     if (s_hasBg) {
-      tft.setTextColor(TFT_BLACK);
-      tft.drawString(buf, 161, kTimeY + kTimeH / 2 + 1, 7);
+      tft.fillRect(0, kTimeY, 320, kTimeH, C_BG);
+      dimBand(0, kTimeY, 320, kTimeH);
     }
-    tft.setTextColor(C_TEXT, s_hasBg ? C_TEXT : C_BG);
-    tft.drawString(buf, 160, kTimeY + kTimeH / 2, 7);
+    textC(cn64, buf, 160, kTimeY, C_TEXT);
     return;
   }
+  if (!timeBox.spr.created()) {
+    timeBox.init(w, kTimeH);
+    s_timeW = w;
+  }
   timeBox.clear(C_BG);
-  timeBox.spr.setTextDatum(MC_DATUM);
-  timeBox.spr.setTextColor(C_TEXT);
-  timeBox.spr.drawString(buf, s_timeW / 2, kTimeH / 2, 7);
+  int x = (s_timeW - tw) / 2;
+  cnDrawTo(timeBox.spr, cn64, buf, x < 0 ? 0 : x, 0, C_TEXT, C_BG);
   timeBox.push(160 - s_timeW / 2, kTimeY);
 }
 
@@ -339,46 +361,44 @@ void drawWeatherCard() {
   tft.fillRoundRect(8, 90, 150, 74, 8, C_CARD);
   drawWeatherIcon(tft, 32, 126, kindOf(s_cond));
 
-  cnDraw(cn15, s_city, 64, 92, C_DIM);
+  cnDraw(cn15, s_city, 64, 92, C_DIM, C_CARD);
 
   char t[8];
   if (s_temp < 0) snprintf(t, sizeof(t), "--");
   else            snprintf(t, sizeof(t), "%d", s_temp);
-  cnDraw(cn28, t, 64, 107, C_TEXT);
+  cnDraw(cn28, t, 64, 107, C_TEXT, C_CARD);
 
   int x = 64 + cnWidth(cn28, t) + 2;
-  cnDraw(cn15, "°C", x, 120, C_WARM);
+  cnDraw(cn15, "°C", x, 120, C_WARM, C_CARD);
   x += cnWidth(cn15, "°C") + 4;
-  cnDraw(cn15, s_cond, x, 121, C_DIM);
+  cnDraw(cn15, s_cond, x, 121, C_DIM, C_CARD);
 
   x = 64;
-  cnDraw(cn15, "空气", x, 142, C_DIM);
+  cnDraw(cn15, "空气", x, 142, C_DIM, C_CARD);
   x += cnWidth(cn15, "空气") + 4;
   char q[8];
   if (s_aqi < 0) snprintf(q, sizeof(q), "--");
   else           snprintf(q, sizeof(q), "%d", s_aqi);
-  cnDraw(cn15, q, x, 142, C_TEXT);
+  cnDraw(cn15, q, x, 142, C_TEXT, C_CARD);
   x += cnWidth(cn15, q) + 4;
-  if (s_aqi >= 0) cnDraw(cn15, s_aqiText, x, 142, aqiColor(s_aqi));
+  if (s_aqi >= 0) cnDraw(cn15, s_aqiText, x, 142, aqiColor(s_aqi), C_CARD);
 }
 
 void drawAlarmCard() {
   tft.fillRoundRect(166, 90, 146, 74, 8, C_CARD);
   bellShape(tft, 184, 124);
 
-  cnDraw(cn15, "下一个闹钟", 206, 94, C_DIM);
+  cnDraw(cn15, "下一个闹钟", 206, 94, C_DIM, C_CARD);
 
   alarms::Alarm a;
   if (alarms::next(s_h, s_m, s_wday, a)) {
     char buf[8];
     snprintf(buf, sizeof(buf), "%02d:%02d", a.hour, a.min);
-    tft.setTextDatum(TL_DATUM);
-    tft.setTextColor(C_TEXT, C_CARD);
-    tft.drawString(buf, 206, 112, 4);
+    cnDraw(cn28, buf, 206, 106, C_TEXT, C_CARD);
     char rep[16];
-    cnDraw(cn15, alarms::repeatText(a.mask, rep, sizeof(rep)), 206, 144, C_DIM);
+    cnDraw(cn15, alarms::repeatText(a.mask, rep, sizeof(rep)), 206, 144, C_DIM, C_CARD);
   } else {
-    cnDraw(cn18, "未设置", 206, 112, C_DIM);
+    cnDraw(cn18, "未设置", 206, 112, C_DIM, C_CARD);
   }
 }
 
@@ -386,11 +406,11 @@ void drawCtrlRow() {
   // two entry tiles: air conditioner and lamp
   tft.fillRoundRect(8, 170, 148, 34, 8, C_CARD);
   acShape(tft, 26, 186);
-  cnDraw(cn15, "空调", 46, 178, C_TEXT);
+  cnDraw(cn15, "空调", 46, 178, C_TEXT, C_CARD);
 
   tft.fillRoundRect(164, 170, 148, 34, 8, C_CARD);
   lampShape(tft, 182, 186);
-  cnDraw(cn15, "灯", 202, 178, C_TEXT);
+  cnDraw(cn15, "灯", 202, 178, C_TEXT, C_CARD);
 }
 
 void drawHomeFooter() {
@@ -471,13 +491,11 @@ void drawAlarmList() {
     tft.fillRoundRect(8, y, 304, 28, 6, C_CARD);
     char buf[8];
     snprintf(buf, sizeof(buf), "%02d:%02d", a->hour, a->min);
-    tft.setTextDatum(TL_DATUM);
-    tft.setTextColor(a->on ? C_TEXT : C_DIM, C_CARD);
-    tft.drawString(buf, 16, y + 1, 4);
+    cnDraw(cn28, buf, 16, y - 1, a->on ? C_TEXT : C_DIM, C_CARD);
 
     char rep[16];
     cnDraw(cn15, alarms::repeatText(a->mask, rep, sizeof(rep)), 118, y + 7,
-           a->on ? C_DIM : C_LINE);
+           a->on ? C_DIM : C_LINE, C_CARD);
     pill(250, y + 3, 54, 22, a->on ? "开" : "关",
          a->on ? 0x0320 : 0x2104, a->on ? C_OK : C_DIM, cn15);
   }
@@ -495,9 +513,7 @@ void drawEdit() {
 
   char buf[8];
   snprintf(buf, sizeof(buf), "%02d:%02d", a->hour, a->min);
-  tft.setTextDatum(MC_DATUM);
-  tft.setTextColor(C_TEXT, C_BG);
-  tft.drawString(buf, 160, 58, 7);
+  cnDraw(cn64, buf, 160 - cnWidth(cn64, buf) / 2, 36, C_TEXT, C_BG);
 
   pill(8,   96, 72, 30, "时-", C_CARD, C_TEXT, cn15);
   pill(88,  96, 72, 30, "时+", C_CARD, C_TEXT, cn15);
@@ -523,15 +539,15 @@ void drawCtrl() {
 
   tft.fillRoundRect(8, 44, 304, 72, 8, C_CARD);
   acShape(tft, 34, 76);
-  cnDraw(cn18, "空调", 64, 54, C_TEXT);
-  cnDraw(cn15, "红外遥控  房间空调", 64, 82, C_DIM);
-  cnDraw(cn15, s_acOn ? "开" : "关", 268, 66, s_acOn ? C_OK : C_DIM);
+  cnDraw(cn18, "空调", 64, 54, C_TEXT, C_CARD);
+  cnDraw(cn15, "红外遥控  房间空调", 64, 82, C_DIM, C_CARD);
+  cnDraw(cn15, s_acOn ? "开" : "关", 268, 66, s_acOn ? C_OK : C_DIM, C_CARD);
 
   tft.fillRoundRect(8, 128, 304, 72, 8, C_CARD);
   lampShape(tft, 34, 162);
-  cnDraw(cn18, "灯", 64, 138, C_TEXT);
-  cnDraw(cn15, "继电器  卧室顶灯", 64, 166, C_DIM);
-  cnDraw(cn15, s_lampOn ? "开" : "关", 268, 150, s_lampOn ? C_OK : C_DIM);
+  cnDraw(cn18, "灯", 64, 138, C_TEXT, C_CARD);
+  cnDraw(cn15, "继电器  卧室顶灯", 64, 166, C_DIM, C_CARD);
+  cnDraw(cn15, s_lampOn ? "开" : "关", 268, 150, s_lampOn ? C_OK : C_DIM, C_CARD);
 
   textC(cn15, "点击卡片切换开关", 160, 212, C_DIM);
 }
@@ -563,10 +579,10 @@ void begin() {
   s_hasBg = drawBgImg();
   if (!s_hasBg) tft.fillScreen(C_BG);
 
-  s_timeW   = tft.textWidth("00:00:00", 7) + 8;
+  s_timeW   = cnWidth(cn64, "00:00:00") + 8;
   s_timeBox = timeBox.init(s_timeW, kTimeH);
-  Serial.printf("[ui] clock box %s, background %s\n",
-                s_timeBox ? "ok" : "off", s_hasBg ? "photo" : "none");
+  Serial.printf("[ui] clock box %s (w %d), background %s\n",
+                s_timeBox ? "ok" : "off", s_timeW, s_hasBg ? "photo" : "none");
 
   drawCurrent();
 }

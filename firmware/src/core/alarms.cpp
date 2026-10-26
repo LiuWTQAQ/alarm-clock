@@ -25,7 +25,7 @@ void defaults() {
 }  // namespace
 
 void begin() {
-  prefs.begin("alm", true);
+  prefs.begin("alm", false);
   s_n = prefs.getInt("n", 0);
   size_t got = prefs.getBytesLength("list");
   if (s_n <= 0 || s_n > kMax || got != sizeof(Alarm) * (size_t)s_n) {
