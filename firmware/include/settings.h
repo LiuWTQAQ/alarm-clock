@@ -25,5 +25,7 @@ bool        hour12();
 void        setHour12(bool v);
 uint8_t     lang();          // 0 = Chinese, 1 = English
 void        setLang(uint8_t v);
+bool        fahrenheit();
+void        setFahrenheit(bool v);
 
 }  // namespace settings

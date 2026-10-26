@@ -26,6 +26,8 @@ void   save();
 const char* repeatText(uint8_t mask, char* buf, int n);
 
 // Earliest enabled alarm strictly after now; false when none.
-bool next(int nowHour, int nowMin, int wday, Alarm& out);
+// Earliest enabled alarm strictly after now. Workday alarms skip weekends,
+// statutory holidays and honour the published make-up workdays.
+bool next(int nowHour, int nowMin, int year, int mon, int day, int wday, Alarm& out);
 
 }  // namespace alarms

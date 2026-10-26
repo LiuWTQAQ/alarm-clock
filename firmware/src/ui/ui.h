@@ -19,6 +19,7 @@ void clearBackground();            // delete /bg.jpg and go back to the plain bl
 void tap(int x, int y);
 void back();
 void debugDumpClock();   // temporary: stream the clock sprite over serial
-void debugDumpScreen();  // temporary: read the clock area back from the panel
+void debugDumpScreen();
+void debugDumpFull();     // 320x240 hex dump for off-device inspection  // temporary: read the clock area back from the panel
 
 }  // namespace ui

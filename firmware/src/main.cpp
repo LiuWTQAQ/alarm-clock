@@ -8,6 +8,7 @@
 #include "net/webcfg.h"
 #include "settings.h"
 #include "core/alarms.h"
+#include "holidays.h"
 
 void setup() {
   Serial.begin(115200);
@@ -35,8 +36,21 @@ static void debugKeys() {
   case 's': ui::tap(240, 187); break;   // home -> settings
   case 't': ui::tap(160, 54);  break;   // toggle 12/24 h
   case 'l': ui::tap(160, 104); break;   // toggle language
+  case 'x': ui::tap(160, 137); break;   // toggle C / F
+  case 'W': ui::tap(160, 50); break;
+  case 'H': {
+    const int t[5][3] = {{2026,10,26},{2026,10,1},{2026,9,20},{2026,10,10},{2026,5,4}};
+    for (auto& d : t)
+      Serial.printf("[cal] %04d-%02d-%02d workday=%d holiday=%d makeup=%d\n",
+                    d[0], d[1], d[2], holidays::isWorkday(d[0], d[1], d[2]),
+                    holidays::isHoliday(d[0], d[1], d[2]),
+                    holidays::isMakeupWorkday(d[0], d[1], d[2]));
+    break;
+  }   // home clock -> world clock
+  case 'C': settings::setCityIndex(5); ui::setCity(settings::cityName()); weather::restart(); break;  // 成都
   case 'p': ui::debugDumpClock(); break;  // dump clock sprite
-  case 'q': ui::debugDumpScreen(); break; // dump clock area from panel
+  case 'q': ui::debugDumpScreen(); break; // dump 320x100 strip
+  case 'f': ui::debugDumpFull();   break; // dump the whole frame
   default: break;
   }
 }

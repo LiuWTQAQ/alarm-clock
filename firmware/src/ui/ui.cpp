@@ -37,7 +37,8 @@ enum Str : uint8_t {
   S_WEEKEND, S_CUSTOM, S_SAVE, S_DELETE, S_REPEAT, S_EDIT_ALARM, S_HR_DEC,
   S_HR_INC, S_MIN_DEC, S_MIN_INC, S_ALARM_ON, S_ALARM_OFF, S_TAP_TOGGLE,
   S_TIME_FMT, S_H24, S_H12, S_LANG, S_WX_UPDATED, S_BACK, S_AIR, S_SMART,
-  S_TAP_CARD, S_NOT_SET, S_NEVER, S_COUNT
+  S_TAP_CARD, S_NOT_SET, S_NEVER, S_NEXT_ALARM, S_TEMP_UNIT, S_WORLD, S_LONDON,
+  S_NEWYORK, S_BEIJING, S_CELSIUS, S_FAHRENHEIT, S_COUNT
 };
 
 const char* kZh[S_COUNT] = {
@@ -47,7 +48,7 @@ const char* kZh[S_COUNT] = {
   "周末", "自定义", "保存", "删除", "重复", "编辑闹钟", "时-",
   "时+", "分-", "分+", "闹钟已开", "闹钟已关", "点击卡片切换开关",
   "时间格式", "24 小时制", "12 小时制", "系统语言", "天气更新", "返回", "空气",
-  "智能家居", "点击卡片切换开关", "未设置", "从未更新",
+  "智能家居", "点击卡片切换开关", "未设置", "从未更新", "下一个闹钟", "温度单位", "世界时间", "伦敦", "纽约", "北京", "摄氏度", "华氏度",
 };
 
 const char* kEn[S_COUNT] = {
@@ -57,7 +58,8 @@ const char* kEn[S_COUNT] = {
   "Weekend", "Custom", "Save", "Delete", "Repeat", "Edit alarm", "Hr-",
   "Hr+", "Min-", "Min+", "Alarm on", "Alarm off", "Tap a card to toggle",
   "Time format", "24-hour", "12-hour", "Language", "Weather updated", "Back", "Air",
-  "Smart home", "Tap a card to toggle", "Not set", "Never",
+  "Smart home", "Tap a card to toggle", "Not set", "Never", "Next alarm", "Temperature", "World clock", "London", "New York", "Beijing",
+  "Celsius", "Fahrenheit",
 };
 
 const char* T(Str s) { return (settings::lang() == 0 ? kZh : kEn)[s]; }
@@ -104,7 +106,7 @@ bool s_hasBg = false;
 int      s_h = 0, s_m = 0, s_s = 0;
 bool     s_timeOk = false;
 int      s_wday = 1;
-int      s_dow = 1, s_mon = 1, s_mday = 1;
+int      s_dow = 1, s_mon = 1, s_mday = 1, s_year = 2026;
 int      s_temp = -1;
 const char* s_cond = "获取中";
 char     s_date[32] = "---";
@@ -116,7 +118,7 @@ const char* s_aqiText = "";
 bool     s_acOn = false;
 bool     s_lampOn = false;
 
-enum Page : uint8_t { P_HOME, P_WEATHER, P_ALARMS, P_EDIT, P_CTRL, P_SETTINGS };
+enum Page : uint8_t { P_HOME, P_WEATHER, P_ALARMS, P_EDIT, P_CTRL, P_SETTINGS, P_WORLD };
 Page s_page = P_HOME;
 int  s_edit = -1;
 
@@ -242,60 +244,83 @@ const char* ampm(int h) { return h < 12 ? "AM" : "PM"; }
 void iconSun(int cx, int cy, int r) {
   for (int a = 0; a < 8; a++) {
     float ang = a * 3.14159265f / 4.0f;
-    float c = cosf(ang), s = sinf(ang);
-    tft.drawLine(cx + (int)(r * 1.05f * c), cy + (int)(r * 1.05f * s),
-                 cx + (int)(r * 1.40f * c), cy + (int)(r * 1.40f * s), C_WARM);
-    tft.drawLine(cx + (int)(r * 1.05f * c) + 1, cy + (int)(r * 1.05f * s),
-                 cx + (int)(r * 1.40f * c) + 1, cy + (int)(r * 1.40f * s), C_WARM);
+    float c = cosf(ang), sn = sinf(ang);
+    tft.drawLine(cx + (int)(r * 1.05f * c), cy + (int)(r * 1.05f * sn),
+                 cx + (int)(r * 1.45f * c), cy + (int)(r * 1.45f * sn), C_WARM);
   }
-  tft.fillCircle(cx, cy, r * 3 / 5, C_WARM);
+  tft.fillCircle(cx, cy, (int)(r * 0.62f), C_WARM);
 }
 
 void iconCloud(int cx, int cy, int r) {
-  tft.fillCircle(cx - r / 2, cy, r * 3 / 5, C_TEXT);
-  tft.fillCircle(cx + r / 4, cy - r / 4, r * 4 / 5, C_TEXT);
-  tft.fillRect(cx - r, cy, 2 * r, r * 3 / 5, C_TEXT);
+  tft.fillCircle(cx - (int)(r * 0.55f), cy + (int)(r * 0.15f), (int)(r * 0.55f), C_TEXT);
+  tft.fillCircle(cx + (int)(r * 0.10f), cy - (int)(r * 0.25f), (int)(r * 0.70f), C_TEXT);
+  tft.fillCircle(cx + (int)(r * 0.60f), cy + (int)(r * 0.10f), (int)(r * 0.50f), C_TEXT);
+  tft.fillRoundRect(cx - (int)(r * 0.95f), cy + (int)(r * 0.10f), (int)(r * 1.9f), (int)(r * 0.60f),
+                    (int)(r * 0.30f), C_TEXT);
 }
 
 void iconRain(int cx, int cy, int r) {
-  iconCloud(cx, cy, r);
-  for (int i = 0; i < 3; i++)
-    tft.drawLine(cx - r / 2 + i * (r / 2), cy + r / 2 + 2, cx - r / 2 + i * (r / 2) - 3, cy + r, C_ACCENT);
+  tft.fillCircle(cx - (int)(r * 0.55f), cy - (int)(r * 0.20f), (int)(r * 0.50f), C_TEXT);
+  tft.fillCircle(cx + (int)(r * 0.10f), cy - (int)(r * 0.55f), (int)(r * 0.62f), C_TEXT);
+  tft.fillCircle(cx + (int)(r * 0.60f), cy - (int)(r * 0.25f), (int)(r * 0.45f), C_TEXT);
+  tft.fillRoundRect(cx - (int)(r * 0.95f), cy - (int)(r * 0.30f), (int)(r * 1.9f), (int)(r * 0.55f),
+                    (int)(r * 0.27f), C_TEXT);
+  for (int i = 0; i < 3; i++) {
+    int x = cx - (int)(r * 0.55f) + i * (int)(r * 0.55f);
+    tft.drawLine(x, (int)(cy + r * 0.45f), x - 2, (int)(cy + r * 0.95f), C_ACCENT);
+  }
 }
 
 void iconSnow(int cx, int cy, int r) {
-  iconCloud(cx, cy, r);
-  for (int i = 0; i < 3; i++) tft.drawPixel(cx - r / 2 + i * (r / 2), cy + r / 2 + 3, C_SNOW);
+  tft.fillCircle(cx - (int)(r * 0.55f), cy - (int)(r * 0.20f), (int)(r * 0.50f), C_TEXT);
+  tft.fillCircle(cx + (int)(r * 0.10f), cy - (int)(r * 0.55f), (int)(r * 0.62f), C_TEXT);
+  tft.fillCircle(cx + (int)(r * 0.60f), cy - (int)(r * 0.25f), (int)(r * 0.45f), C_TEXT);
+  tft.fillRoundRect(cx - (int)(r * 0.95f), cy - (int)(r * 0.30f), (int)(r * 1.9f), (int)(r * 0.55f),
+                    (int)(r * 0.27f), C_TEXT);
+  for (int i = 0; i < 3; i++) {
+    int x = cx - (int)(r * 0.55f) + i * (int)(r * 0.60f);
+    int y = cy + (int)(r * 0.75f);
+    tft.drawFastHLine(x - 3, y, 7, C_SNOW);
+    tft.drawFastVLine(x, y - 3, 7, C_SNOW);
+  }
 }
 
 void iconFog(int cx, int cy, int r) {
-  iconCloud(cx, cy - r / 4, r);
+  tft.fillCircle(cx - (int)(r * 0.45f), cy - (int)(r * 0.35f), (int)(r * 0.45f), C_DIM);
+  tft.fillCircle(cx + (int)(r * 0.15f), cy - (int)(r * 0.60f), (int)(r * 0.55f), C_DIM);
+  tft.fillRoundRect(cx - (int)(r * 0.85f), cy - (int)(r * 0.45f), (int)(r * 1.7f), (int)(r * 0.50f),
+                    (int)(r * 0.25f), C_DIM);
   for (int i = 0; i < 3; i++)
-    tft.drawFastHLine(cx - r, cy + r / 2 + 3 + i * 4, 2 * r - i * 3, C_LINE);
+    tft.drawFastHLine(cx - r + i * 2, cy + (int)(r * 0.25f) + i * 5, 2 * r - i * 5, C_LINE);
 }
 
 void iconThunder(int cx, int cy, int r) {
-  iconCloud(cx, cy, r);
-  tft.drawLine(cx, cy + r / 3, cx - 4, cy + r, C_WARM);
-  tft.drawLine(cx - 4, cy + r, cx + 4, cy + r, C_WARM);
-  tft.drawLine(cx + 4, cy + r, cx + 1, cy + r + r / 2, C_WARM);
+  tft.fillCircle(cx - (int)(r * 0.55f), cy - (int)(r * 0.30f), (int)(r * 0.48f), C_TEXT);
+  tft.fillCircle(cx + (int)(r * 0.10f), cy - (int)(r * 0.62f), (int)(r * 0.60f), C_TEXT);
+  tft.fillCircle(cx + (int)(r * 0.60f), cy - (int)(r * 0.35f), (int)(r * 0.44f), C_TEXT);
+  tft.fillRoundRect(cx - (int)(r * 0.95f), cy - (int)(r * 0.40f), (int)(r * 1.9f), (int)(r * 0.52f),
+                    (int)(r * 0.26f), C_TEXT);
+  tft.fillTriangle(cx + 2, (int)(cy + r * 0.15f), cx - 6, (int)(cy + r * 0.85f),
+                   cx + 6, (int)(cy + r * 0.85f), C_WARM);
+  tft.fillTriangle(cx + 1, (int)(cy + r * 0.55f), cx - 6, (int)(cy + r * 1.05f),
+                   cx + 5, (int)(cy + r * 0.95f), C_WARM);
 }
 
 void iconHaze(int cx, int cy, int r) {
-  tft.fillCircle(cx, cy - r / 4, r * 3 / 5, C_SAND);
+  tft.fillCircle(cx, cy - (int)(r * 0.35f), (int)(r * 0.55f), C_SAND);
   for (int i = 0; i < 3; i++)
-    tft.drawFastHLine(cx - r, cy + r / 3 + i * 5, 2 * r, C_LINE);
+    tft.drawFastHLine(cx - r, cy + (int)(r * 0.30f) + i * 5, 2 * r, C_LINE);
 }
 
-void drawWeatherIcon(int cx, int cy, int kind) {
+void drawWeatherIcon(int cx, int cy, int kind, int r) {
   switch (kind) {
-    case 0: iconSun(cx, cy, 10); break;
-    case 1: iconCloud(cx, cy, 10); break;
-    case 2: iconRain(cx, cy, 10); break;
-    case 3: iconSnow(cx, cy, 10); break;
-    case 4: iconFog(cx, cy, 10); break;
-    case 5: iconThunder(cx, cy, 10); break;
-    default: iconHaze(cx, cy, 10); break;
+    case 0: iconSun(cx, cy, r); break;
+    case 1: iconCloud(cx, cy, r); break;
+    case 2: iconRain(cx, cy, r); break;
+    case 3: iconSnow(cx, cy, r); break;
+    case 4: iconFog(cx, cy, r); break;
+    case 5: iconThunder(cx, cy, r); break;
+    default: iconHaze(cx, cy, r); break;
   }
 }
 
@@ -319,11 +344,47 @@ uint8_t kindOf(const char* s) {
   return 1;
 }
 
-void bellIcon(int x, int y, uint16_t col) {
-  tft.fillRoundRect(x - 9, y - 8, 18, 15, 4, col);
-  tft.fillRect(x - 11, y + 6, 22, 3, col);
-  tft.fillCircle(x, y + 12, 3, col);
+void bellIcon(int x, int y, int r, uint16_t col) {
+  tft.fillCircle(x, y - (int)(r * 0.15f), (int)(r * 0.62f), col);
+  tft.fillRect(x - (int)(r * 0.62f), y - (int)(r * 0.15f), (int)(r * 1.24f), (int)(r * 0.62f), col);
+  tft.fillRoundRect(x - (int)(r * 0.85f), y + (int)(r * 0.42f), (int)(r * 1.7f), (int)(r * 0.26f), 2, col);
+  tft.fillCircle(x, y + (int)(r * 0.85f), (int)(r * 0.16f), col);
 }
+
+static const uint32_t kWorld[32][2] = {
+  {0x00000000,0x00000000},
+  {0x00000000,0x00000000},
+  {0x00000000,0x00000000},
+  {0x07FFE000,0x00004000},
+  {0x3FFFF000,0x0000FF00},
+  {0x07FFFC00,0x0F03FFF8},
+  {0x00FFFC00,0x7E07FFF8},
+  {0x007FFE00,0x7E3FFFFC},
+  {0x007FF000,0xFFFFFFE0},
+  {0x003FE003,0xF3FFFF80},
+  {0x001FE000,0x3CFFFE00},
+  {0x000FC000,0x7E3FFC00},
+  {0x00020000,0xFE1FF000},
+  {0x0000000F,0xFF0FE000},
+  {0x00007807,0xFFC78000},
+  {0x00007F03,0xFF800000},
+  {0x00007F80,0x7F000000},
+  {0x00007FC0,0x7E000000},
+  {0x00007FC0,0x3E000380},
+  {0x00003FC0,0x3C000FE0},
+  {0x00003F00,0x3C000FF0},
+  {0x00003E00,0x18000FE0},
+  {0x00003C00,0x10000840},
+  {0x00003800,0x00000000},
+  {0x00003800,0x00000000},
+  {0x00001000,0x00000000},
+  {0x00000000,0x00000000},
+  {0x00000000,0x00000000},
+  {0x00000000,0xFFFFFFFF},
+  {0x00000000,0xFFFFFFFF},
+  {0x00000000,0xFFFFFFFF},
+  {0x00000000,0xFFFFFFFF},
+};
 
 // ---------- background photo ----------
 extern const unsigned char bg_jpg[];
@@ -410,25 +471,22 @@ void drawBar() {
 
 void drawWeatherCard() {
   tft.fillRoundRect(8, 90, 150, 74, 8, C_CARD);
-  uint8_t kind = kindOf(s_cond);
-  int ix = 30, iy = 126;
-  switch (kind) {
-    case 0: iconSun(ix, iy, 8); break;
-    case 1: iconCloud(ix, iy, 8); break;
-    case 2: iconRain(ix, iy, 8); break;
-    case 3: iconSnow(ix, iy, 8); break;
-    case 4: iconFog(ix, iy, 8); break;
-    case 5: iconThunder(ix, iy, 8); break;
-    default: iconHaze(ix, iy, 8); break;
-  }
+  drawWeatherIcon(30, 120, kindOf(s_cond), 11);
+
   cnDraw(cn15, s_city, 60, 93, C_DIM, C_CARD);
+
   char t[12];
-  if (s_temp > -90) snprintf(t, sizeof(t), "%d", s_temp); else snprintf(t, sizeof(t), "--");
+  int  v = s_temp;
+  if (s_temp > -90 && settings::fahrenheit()) v = (s_temp * 9 + 2) / 5 + 32;
+  if (v > -90) snprintf(t, sizeof(t), "%d", v); else snprintf(t, sizeof(t), "--");
   cnDraw(cn28, t, 60, 108, C_TEXT, C_CARD);
-  int x = 60 + cnWidth(cn28, t) + 2;
-  cnDraw(cn15, "°C", x, 121, C_WARM, C_CARD);
-  x += cnWidth(cn15, "°C") + 4;
-  cnDraw(cn15, condText(s_cond), x, 122, C_DIM, C_CARD);
+
+  int x = 60 + cnWidth(cn28, t) + 4;
+  tft.drawCircle(x + 3, 114, 3, C_WARM);
+  tft.drawCircle(x + 3, 114, 2, C_WARM);
+  cnDraw(cn15, settings::fahrenheit() ? "F" : "C", x + 8, 121, C_WARM, C_CARD);
+  x += 8 + cnWidth(cn15, "C") + 5;
+  cnDraw(cn15, condText(s_cond), x, 121, C_DIM, C_CARD);
 
   x = 60;
   cnDraw(cn15, T(S_AIR), x, 143, C_DIM, C_CARD);
@@ -442,18 +500,20 @@ void drawWeatherCard() {
 
 void drawAlarmCard() {
   tft.fillRoundRect(166, 90, 146, 74, 8, C_CARD);
-  cnDraw(cn15, T(S_ALARMS), 206, 94, C_DIM, C_CARD);
+  bellIcon(186, 121, 11, C_WARM);
+  cnDraw(cn15, T(S_NEXT_ALARM), 206, 92, C_DIM, C_CARD);
+
   alarms::Alarm a;
-  if (alarms::next(s_h, s_m, s_wday, a)) {
+  if (alarms::next(s_h, s_m, 2000 + s_year, s_mon, s_mday, s_wday, a)) {
     char buf[12];
     fmtHM(buf, sizeof(buf), a.hour, a.min);
-    cnDraw(cn28, buf, 206, 106, C_TEXT, C_CARD);
+    cnDraw(cn28, buf, 206, 110, C_TEXT, C_CARD);
     if (settings::hour12()) {
       int x = 206 + cnWidth(cn28, buf) + 2;
-      cnDraw(cn15, ampm(a.hour), x, 118, C_WARM, C_CARD);
+      cnDraw(cn15, ampm(a.hour), x, 122, C_WARM, C_CARD);
     }
     char rep[16];
-    cnDraw(cn15, repText(a.mask, rep, sizeof(rep)), 206, 144, C_DIM, C_CARD);
+    cnDraw(cn15, repText(a.mask, rep, sizeof(rep)), 206, 146, C_DIM, C_CARD);
   } else {
     cnDraw(cn18, T(S_NO_ALARM), 206, 112, C_DIM, C_CARD);
   }
@@ -666,29 +726,143 @@ void drawSettingsPage() {
   if (s_hasBg) drawBgImg(); else tft.fillScreen(C_BG);
   topBar(T(S_SETTINGS));
 
-  cnDraw(cn15, T(S_TIME_FMT), 12, 46, C_DIM);
-  pill(140, 38, 168, 32, settings::hour12() ? T(S_H12) : T(S_H24), C_CARD, C_ACCENT, cn15);
+  cnDraw(cn15, T(S_TIME_FMT), 12, 42, C_DIM);
+  pill(140, 34, 168, 30, settings::hour12() ? T(S_H12) : T(S_H24), C_CARD, C_ACCENT, cn15);
 
-  cnDraw(cn15, T(S_LANG), 12, 96, C_DIM);
-  pill(140, 88, 168, 32, settings::lang() ? "English" : "中文", C_CARD, C_ACCENT, cn15);
+  cnDraw(cn15, T(S_LANG), 12, 86, C_DIM);
+  pill(140, 78, 168, 30, settings::lang() ? "English" : "中文", C_CARD, C_ACCENT, cn15);
 
-  cnDraw(cn15, T(S_WX_UPDATED), 12, 146, C_DIM);
-  char upd[12];
-  time_t lu = (time_t)weather::lastUpdate();
-  if (lu > 0) {
-    struct tm tm;
-    localtime_r(&lu, &tm);
-    fmtHM(upd, sizeof(upd), tm.tm_hour, tm.tm_min);
+  cnDraw(cn15, T(S_TEMP_UNIT), 12, 130, C_DIM);
+  pill(140, 122, 168, 30, settings::fahrenheit() ? T(S_FAHRENHEIT) : T(S_CELSIUS), C_CARD, C_ACCENT, cn15);
+
+  cnDraw(cn15, T(S_WX_UPDATED), 12, 176, C_DIM);
+  char upd[24];
+  unsigned long up = weather::lastUpdate();     // millis() of the last fetch
+  if (up > 0 && time(nullptr) > 1600000000) {
+    time_t lu = time(nullptr) - (time_t)((millis() - up) / 1000);
+    struct tm tmv;
+    localtime_r(&lu, &tmv);
+    snprintf(upd, sizeof(upd), "%04d-%02d-%02d %02d:%02d:%02d",
+             tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday,
+             tmv.tm_hour, tmv.tm_min, tmv.tm_sec);
   } else {
-    snprintf(upd, sizeof(upd), "--:--");
+    snprintf(upd, sizeof(upd), "--");
   }
-  cnDraw(cn18, upd, 140, 140, C_TEXT);
+  cnDraw(cn15, upd, 140, 176, C_TEXT);
 
-  cnDraw(cn15, settings::lang() ? "Tap to change" : "点击切换", 12, 186, C_DIM);
-  cnDraw(cn15, T(S_TAP_BACK), 12, 216, C_DIM);
+  cnDraw(cn15, settings::lang() ? "Tap to change" : "点击切换", 12, 212, C_DIM);
 }
 
 // ---------- dispatch ----------
+
+// ---------- world clock ----------
+const int kMapX = 0, kMapY = 132, kMapW = 320, kMapH = 96;
+
+void cityNow(int idx, struct tm& out) {
+  time_t now = time(nullptr);
+  struct tm lt;
+  localtime_r(&now, &lt);
+  int off = 8;                                   // Beijing
+  if (idx == 0) {                                // London: BST last Sun Mar .. last Sun Oct
+    bool bst = (lt.tm_mon > 2 && lt.tm_mon < 9) ||
+               (lt.tm_mon == 2 && lt.tm_mday >= 25) ||
+               (lt.tm_mon == 9 && lt.tm_mday < 25);
+    off = bst ? 1 : 0;
+  }
+  if (idx == 1) {                                // New York: EDT 2nd Sun Mar .. 1st Sun Nov
+    bool edt = (lt.tm_mon > 2 && lt.tm_mon < 10) ||
+               (lt.tm_mon == 2 && lt.tm_mday >= 8) ||
+               (lt.tm_mon == 10 && lt.tm_mday < 1);
+    off = edt ? -4 : -5;
+  }
+  time_t t = now + off * 3600;
+  gmtime_r(&t, &out);
+}
+
+void drawWorldMap() {
+  const float DEG = 3.14159265f / 180.0f;
+  time_t now = time(nullptr);
+  struct tm utc;
+  gmtime_r(&now, &utc);
+  int doy = utc.tm_yday;
+  float decl = 23.44f * sinf(2.0f * 3.14159265f * (284 + doy) / 365.0f);
+  float subsolar = -15.0f * (utc.tm_hour + utc.tm_min / 60.0f - 12.0f);
+
+  tft.fillRect(kMapX, kMapY, kMapW, kMapH, 0x0841);
+  // land
+  for (int gy = 0; gy < 32; gy++) {
+    uint32_t hi = kWorld[gy][0], lo = kWorld[gy][1];
+    if (!hi && !lo) continue;
+    for (int gx = 0; gx < 64; gx++) {
+      bool land = gx < 32 ? (hi & (1u << (31 - gx))) : (lo & (1u << (63 - gx)));
+      if (land) tft.fillRect(kMapX + gx * 5, kMapY + gy * 3, 5, 3, 0x4A69);
+    }
+  }
+  // graticule
+  for (int i = 1; i < 6; i++)
+    tft.drawFastVLine(kMapX + i * kMapW / 6, kMapY, kMapH, 0x18E3);
+  for (int i = 1; i < 4; i++)
+    tft.drawFastHLine(kMapX, kMapY + i * kMapH / 4, kMapW, 0x18E3);
+
+  // night shading (checkerboard) + terminator curve
+  float sinLat[96], cosLat[96], cosH[320];
+  for (int y = 0; y < kMapH; y++) {
+    float lat = (90.0f - (y + 0.5f) * 180.0f / kMapH) * DEG;
+    sinLat[y] = sinf(lat); cosLat[y] = cosf(lat);
+  }
+  for (int x = 0; x < kMapW; x++) {
+    float lon = -180.0f + (x + 0.5f) * 360.0f / kMapW;
+    cosH[x] = cosf((lon - subsolar) * DEG);
+  }
+  float sd = sinf(decl * DEG), cd = cosf(decl * DEG);
+  for (int y = 0; y < kMapH; y++)
+    for (int x = 0; x < kMapW; x++) {
+      float e = sinLat[y] * sd + cosLat[y] * cd * cosH[x];
+      if (e < 0 && ((x + y) & 1)) tft.drawPixel(kMapX + x, kMapY + y, 0x1082);
+    }
+  if (fabsf(tanf(decl * DEG)) > 0.02f) {
+    for (int x = 0; x < kMapW; x++) {
+      float phi = atanf(-cosH[x] / tanf(decl * DEG)) / DEG;
+      int y = (int)((90.0f - phi) * kMapH / 180.0f);
+      if (y >= 0 && y < kMapH) tft.drawPixel(kMapX + x, kMapY + y, C_WARM);
+    }
+  }
+  // city markers
+  const float clat[3] = {51.5f, 40.7f, 39.9f};
+  const float clon[3] = {-0.13f, -74.0f, 116.4f};
+  for (int i = 0; i < 3; i++) {
+    int x = kMapX + (int)((clon[i] + 180.0f) * kMapW / 360.0f);
+    int y = kMapY + (int)((90.0f - clat[i]) * kMapH / 180.0f);
+    tft.fillCircle(x, y, 2, C_ACCENT);
+  }
+}
+
+void drawWorldTimes() {
+  for (int i = 0; i < 3; i++) {
+    int y = 32 + i * 30;
+    tft.fillRect(150, y, 166, 26, s_hasBg ? C_BG : C_BG);
+    struct tm t;
+    cityNow(i, t);
+    char b[12];
+    fmtHMS(b, sizeof(b), t.tm_hour, t.tm_min, t.tm_sec);
+    cnDraw(cn28, b, 306 - cnWidth(cn28, b), y - 2, C_TEXT, C_BG);
+  }
+}
+
+void drawWorldPage() {
+  if (s_hasBg) drawBgImg(); else tft.fillScreen(C_BG);
+  topBar(T(S_WORLD));
+  const Str names[3] = {S_LONDON, S_NEWYORK, S_BEIJING};
+  for (int i = 0; i < 3; i++) {
+    int y = 32 + i * 30;
+    tft.fillRoundRect(8, y, 304, 28, 6, C_CARD);
+    cnDraw(cn15, T(names[i]), 16, y + 6, C_DIM, C_CARD);
+  }
+  drawWorldTimes();
+  drawWorldMap();
+  cnDraw(cn15, settings::lang() ? "tap to go back" : "点击空白处返回", 12, 232, C_DIM);
+}
+
 void drawCurrent() {
   switch (s_page) {
     case P_HOME:     drawHome();        break;
@@ -697,6 +871,7 @@ void drawCurrent() {
     case P_EDIT:     drawEditPage();    break;
     case P_CTRL:     drawCtrlPage();    break;
     case P_SETTINGS: drawSettingsPage();break;
+    case P_WORLD:    drawWorldPage();    break;
   }
 }
 
@@ -751,11 +926,12 @@ void tick(const struct tm& t) {
 
   if (t.tm_wday != lastWday || t.tm_mday != lastDay) {
     lastWday = t.tm_wday; lastDay = t.tm_mday;
-    s_dow = t.tm_wday; s_mon = t.tm_mon + 1; s_mday = t.tm_mday;
+    s_dow = t.tm_wday; s_mon = t.tm_mon + 1; s_mday = t.tm_mday; s_year = t.tm_year + 1900;
     rebuildDate();
     dateChanged = true;
   }
 
+  if (s_page == P_WORLD) { drawWorldTimes(); return; }
   if (s_page != P_HOME) return;
   if (!wasOk || dateChanged) drawHeader();
   drawClock();
@@ -790,6 +966,7 @@ void setAqi(int aqi, const char* label) {
 void tap(int x, int y) {
   switch (s_page) {
   case P_HOME:
+    if (inR(x, y, 0, 24, 320, 56))   { go(P_WORLD);    return; }
     if (inR(x, y, 8, 90, 150, 74))   { go(P_WEATHER);  return; }
     if (inR(x, y, 166, 90, 146, 74)) { go(P_ALARMS);   return; }
     if (inR(x, y, 8, 170, 148, 34))  { go(P_CTRL);     return; }
@@ -798,6 +975,9 @@ void tap(int x, int y) {
 
   case P_WEATHER:
     if (y < 27 || y > 206) { go(P_HOME); return; }
+    break;
+  case P_WORLD:
+    if (y < 27 || y > 224) { go(P_HOME); return; }
     break;
 
   case P_ALARMS: {
@@ -863,6 +1043,11 @@ void tap(int x, int y) {
       drawSettingsPage();
       return;
     }
+    if (inR(x, y, 12, 122, 296, 32)) {
+      settings::setFahrenheit(!settings::fahrenheit());
+      drawSettingsPage();
+      return;
+    }
     if (y > 200) { go(P_HOME); return; }
     break;
   }
@@ -888,6 +1073,19 @@ void debugDumpClock() {
     if ((i & 31) == 31) Serial.println();
   }
   Serial.println("END");
+}
+
+void debugDumpFull() {
+  uint16_t* buf = (uint16_t*)malloc(320 * 240 * 2);
+  if (!buf) { Serial.println("NOMEM"); return; }
+  tft.readRect(0, 0, 320, 240, buf);
+  Serial.printf("FULL 320 240\n");
+  for (int i = 0; i < 320 * 240; i++) {
+    Serial.printf("%04X", buf[i]);
+    if ((i & 31) == 31) Serial.print('\n');
+  }
+  Serial.println("END");
+  free(buf);
 }
 
 void debugDumpScreen() {

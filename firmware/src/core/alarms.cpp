@@ -1,4 +1,6 @@
 #include "alarms.h"
+#include "holidays.h"
+#include <time.h>
 #include <Preferences.h>
 
 namespace alarms {
@@ -72,7 +74,7 @@ const char* repeatText(uint8_t mask, char* buf, int n) {
   return buf;
 }
 
-bool next(int nowHour, int nowMin, int wday, Alarm& out) {
+bool next(int nowHour, int nowMin, int year, int mon, int day, int wday, Alarm& out) {
   int now = nowHour * 60 + nowMin;
   int best = 100000;
   bool have = false;
@@ -85,6 +87,14 @@ bool next(int nowHour, int nowMin, int wday, Alarm& out) {
       int wd = (wday + d) % 7;              // 0 = Sunday
       int bit = (wd + 6) % 7;               // mask bit 0 = Monday
       if (a.mask != 0 && !(a.mask & (1 << bit))) continue;
+
+      struct tm cd = {};
+      cd.tm_year = year - 1900; cd.tm_mon = mon - 1; cd.tm_mday = day + d; cd.tm_hour = 12;
+      mktime(&cd);
+      // 工作日模式：跳过周末与法定节假日，但调休上班日照常响
+      if (a.mask == 0x1F && !holidays::isWorkday(cd.tm_year + 1900, cd.tm_mon + 1, cd.tm_mday))
+        continue;
+
       int delta = d * 1440 + t - now;
       if (delta <= 0) continue;
       bestDelta = delta;

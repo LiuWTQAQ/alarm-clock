@@ -52,14 +52,16 @@ Preferences  prefs;
 int          s_idx = 0;
 bool         s_hour12 = false;
 uint8_t      s_lang   = 0;
+bool         s_fahr   = false;
 
 }  // namespace
 
 void begin() {
   prefs.begin("cfg", true);
-  int i = prefs.getInt("city", 0);
+  int i = prefs.getInt("city", 5);   // 成都
   s_hour12 = prefs.getBool("h12", false);
   s_lang   = prefs.getUChar("lang", 0);
+  s_fahr   = prefs.getBool("fahr", false);
   prefs.end();
   s_idx = (i >= 0 && i < kN) ? i : 0;
 }
@@ -84,6 +86,12 @@ void setHour12(bool v) {
   prefs.begin("cfg", false); prefs.putBool("h12", v); prefs.end();
 }
 uint8_t lang()         { return s_lang; }
+
+bool fahrenheit()      { return s_fahr; }
+void setFahrenheit(bool v) {
+  s_fahr = v;
+  prefs.begin("cfg", false); prefs.putBool("fahr", v); prefs.end();
+}
 void setLang(uint8_t v) {
   s_lang = v ? 1 : 0;
   prefs.begin("cfg", false); prefs.putUChar("lang", s_lang); prefs.end();
