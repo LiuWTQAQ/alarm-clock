@@ -38,6 +38,11 @@ static void debugKeys() {
   case 'l': ui::tap(160, 104); break;   // toggle language
   case 'x': ui::tap(160, 137); break;   // toggle C / F
   case 'W': ui::tap(160, 50); break;
+  case 'm':
+    Serial.printf("[mem] free %u B (%.1f KB), min %u B, largest block %u B\n",
+                  ESP.getFreeHeap(), ESP.getFreeHeap() / 1024.0,
+                  ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
+    break;
   case 'H': {
     const int t[5][3] = {{2026,10,26},{2026,10,1},{2026,9,20},{2026,10,10},{2026,5,4}};
     for (auto& d : t)

@@ -676,7 +676,12 @@ void drawEditPage() {
 
   char buf[12];
   fmtHM(buf, sizeof(buf), a->hour, a->min);
-  textC(cn64, buf, 160, 30, C_TEXT);
+  int tw = cnWidth(cn64, buf);
+  int wa = settings::hour12() ? cnWidth(cn15, ampm(a->hour)) + 4 : 0;
+  int x0 = 160 - (tw + wa) / 2;
+  cnDraw(cn64, buf, x0, 30, C_TEXT);
+  if (settings::hour12())
+    cnDraw(cn15, ampm(a->hour), x0 + tw + 4, 66, C_WARM);
 
   pill(8,   90, 72, 30, T(S_HR_DEC), C_CARD, C_TEXT, cn15);
   pill(88,  90, 72, 30, T(S_HR_INC), C_CARD, C_TEXT, cn15);
@@ -756,7 +761,7 @@ void drawSettingsPage() {
 // ---------- dispatch ----------
 
 // ---------- world clock ----------
-const int kMapX = 0, kMapY = 132, kMapW = 320, kMapH = 96;
+const int kMapX = 0, kMapY = 132, kMapW = 320, kMapH = 86;
 
 void cityNow(int idx, struct tm& out) {
   time_t now = time(nullptr);
@@ -840,12 +845,12 @@ void drawWorldMap() {
 void drawWorldTimes() {
   for (int i = 0; i < 3; i++) {
     int y = 32 + i * 30;
-    tft.fillRect(150, y, 166, 26, s_hasBg ? C_BG : C_BG);
+    tft.fillRect(150, y, 166, 26, C_CARD);
     struct tm t;
     cityNow(i, t);
     char b[12];
-    fmtHMS(b, sizeof(b), t.tm_hour, t.tm_min, t.tm_sec);
-    cnDraw(cn28, b, 306 - cnWidth(cn28, b), y - 2, C_TEXT, C_BG);
+    snprintf(b, sizeof(b), "%02d:%02d:%02d", t.tm_hour, t.tm_min, t.tm_sec);
+    cnDraw(cn28, b, 306 - cnWidth(cn28, b), y - 2, C_TEXT, C_CARD);
   }
 }
 
@@ -860,7 +865,7 @@ void drawWorldPage() {
   }
   drawWorldTimes();
   drawWorldMap();
-  cnDraw(cn15, settings::lang() ? "tap to go back" : "点击空白处返回", 12, 232, C_DIM);
+  cnDraw(cn15, settings::lang() ? "tap to go back" : "点击空白处返回", 12, 222, C_DIM);
 }
 
 void drawCurrent() {
@@ -1059,7 +1064,8 @@ void back() {
     case P_ALARMS:
     case P_WEATHER:
     case P_CTRL:
-    case P_SETTINGS: go(P_HOME); break;
+    case P_SETTINGS:
+    case P_WORLD:    go(P_HOME); break;
     default: break;
   }
 }
