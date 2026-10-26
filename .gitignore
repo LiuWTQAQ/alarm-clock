@@ -1,0 +1,21 @@
+# PlatformIO 构建产物
+.pio/
+.vscode/
+
+# macOS
+.DS_Store
+
+# 密钥（绝不入库）
+firmware/include/secrets.h
+**/secrets.h
+
+# Python / Node
+__pycache__/
+*.pyc
+server/.env
+node_modules/
+
+# 编译输出
+*.bin
+*.elf
+*.map
