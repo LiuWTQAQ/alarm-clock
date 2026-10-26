@@ -7,11 +7,13 @@
 #include "net/weather.h"
 #include "net/webcfg.h"
 #include "settings.h"
+#include "core/alarms.h"
 
 void setup() {
   Serial.begin(115200);
   delay(300);
   settings::begin();
+  alarms::begin();
   Serial.printf("\n=== alarm-clock ===  city=%s\n", settings::cityName());
 
   ui::begin();              // screen first, so we have feedback even without Wi-Fi
@@ -21,8 +23,22 @@ void setup() {
   weather::begin();         // first fetch ~2 s after boot
 }
 
+static void debugKeys() {
+  if (!Serial.available()) return;
+  char c = Serial.read();
+  switch (c) {
+  case 'w': ui::tap(80, 120);  break;   // home -> weather detail
+  case 'a': ui::tap(240, 120); break;   // home -> alarm list
+  case 'c': ui::tap(80, 185);  break;   // home -> smart home
+  case 'e': ui::tap(40, 50);   break;   // list -> edit first alarm
+  case 'b': ui::back();        break;   // back to home
+  default: break;
+  }
+}
+
 void loop() {
   net_time::loop();
+  debugKeys();
   weather::loop();
   if (net_time::connected() && !webcfg::started()) webcfg::begin();
   if (webcfg::started()) webcfg::loop();

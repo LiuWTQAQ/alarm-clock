@@ -37,7 +37,8 @@ const char* MID = R"HTML(</select><button>保存城市</button>
 <input type="file" name="f" accept="image/jpeg">
 <button>上传并应用</button>
 <div class="note">图片会按等比缩放铺满屏幕，并自动压暗一半以保证文字可读。上传后立即生效。</div>
-<img src="/bg.jpg" alt="当前背景"></form>
+<img src="/bg.jpg" alt="当前背景">
+<button formaction="/bg/clear" formmethod="get" style="background:#30363d">恢复默认背景</button></form>
 </body></html>)HTML";
 
 String page() {
@@ -103,6 +104,11 @@ void begin() {
   server.on("/upload", HTTP_POST,
             []() { server.sendHeader("Location", "/", true); server.send(302, "text/plain", ""); },
             handleUpload);
+  server.on("/bg/clear", []() {
+    ui::clearBackground();
+    server.sendHeader("Location", "/", true);
+    server.send(302, "text/plain", "");
+  });
   server.on("/bg.jpg", handleBg);
   server.begin();
   MDNS.begin("alarm");

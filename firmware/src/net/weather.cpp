@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
+#include <ArduinoJson.h>
 #include "config.h"
 #include "settings.h"
 
@@ -24,6 +25,11 @@ const Entry kMap[] = {
 };
 
 int      s_temp  = -1;
+int      s_app   = -1;
+int      s_hum   = -1;
+int      s_dayCode[3] = {-1, -1, -1};
+int      s_dayMax[3]  = {-999, -999, -999};
+int      s_dayMin[3]  = {-999, -999, -999};
 int      s_code  = -1;
 const char* s_cond = "获取中";
 int      s_aqi   = -1;
@@ -60,10 +66,12 @@ bool fetchWeather() {
   client.setInsecure();
   HTTPClient http;
 
-  char url[240];
+  char url[300];
   snprintf(url, sizeof(url),
            "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
-           "&current=temperature_2m,weather_code&timezone=Asia%%2FShanghai",
+           "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code"
+           "&daily=weather_code,temperature_2m_max,temperature_2m_min"
+           "&forecast_days=4&timezone=Asia%%2FShanghai",
            (double)settings::lat(), (double)settings::lon());
 
   if (!http.begin(client, url)) { Serial.println("[wx] begin failed"); return false; }
@@ -77,14 +85,28 @@ bool fetchWeather() {
   String body = http.getString();
   http.end();
 
-  int cur = body.indexOf("\"current\":");
-  if (cur < 0) { Serial.println("[wx] no current block"); return false; }
-  float t = jsonNumber(body, "\"temperature_2m\"", cur);
-  float c = jsonNumber(body, "\"weather_code\"", cur);
-  if (isnan(t) || isnan(c)) { Serial.println("[wx] parse failed"); return false; }
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, body);
+  if (err) { Serial.printf("[wx] json %s\n", err.c_str()); return false; }
 
-  s_temp = (int)lroundf(t);
-  s_code = (int)c;
+  JsonObject cur = doc["current"];
+  if (cur.isNull()) { Serial.println("[wx] no current block"); return false; }
+
+  s_temp = (int)lroundf(cur["temperature_2m"] | -99.0f);
+  s_app  = (int)lroundf(cur["apparent_temperature"] | -99.0f);
+  s_hum  = (int)(cur["relative_humidity_2m"] | -1);
+  s_code = (int)(cur["weather_code"] | -1);
+
+  JsonArray dcode = doc["daily"]["weather_code"];
+  JsonArray dmax  = doc["daily"]["temperature_2m_max"];
+  JsonArray dmin  = doc["daily"]["temperature_2m_min"];
+  for (int i = 0; i < 3; i++) {
+    int k = i + 1;                       // 0 is today, we want the next three
+    if (k >= (int)dcode.size()) break;
+    s_dayCode[i] = dcode[k] | -1;
+    s_dayMax[i]  = (int)lroundf(dmax[k] | -999.0f);
+    s_dayMin[i]  = (int)lroundf(dmin[k] | -999.0f);
+  }
   return true;
 }
 
@@ -130,6 +152,8 @@ void begin() { s_next = millis() + 2000; }
 
 void restart() {
   s_valid = false;
+  s_app = -1;
+  s_hum = -1;
   s_aqi   = -1;
   s_next  = millis() + 500;
   Serial.println("[wx] restart for new city");
@@ -158,6 +182,19 @@ bool valid()        { return s_valid; }
 int  tempC()        { return s_temp; }
 const char* cond()  { return s_cond; }
 int  aqi()          { return s_aqi; }
+
+int         apparentC() { return s_app; }
+int         humidity()  { return s_hum; }
+
+const char* textForCode(int code) {
+  for (const Entry& e : kMap)
+    if (e.code == code) return e.text;
+  return "--";
+}
+
+int         dayCode(int i) { return (i >= 0 && i < 3) ? s_dayCode[i] : -1; }
+int         dayMax(int i)  { return (i >= 0 && i < 3) ? s_dayMax[i] : -999; }
+int         dayMin(int i)  { return (i >= 0 && i < 3) ? s_dayMin[i] : -999; }
 
 const char* aqiText() {
   if (s_aqi < 0)   return "";
