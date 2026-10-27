@@ -19,13 +19,14 @@ command -v mosquitto >/dev/null 2>&1 || { echo "!! 安装后仍找不到 mosquit
 echo "==> 2/6 生成密码文件"
 MOSQ_UID=$(id -u mosquitto 2>/dev/null || echo 0)
 mosquitto_passwd -b -c /etc/mosquitto/passwd "$MQ_USER" "$MQ_PASS"
+# 644：mosquitto 可能以非 root 身份读取（文件里是 PBKDF2 哈希，不是明文）
 chown root:root /etc/mosquitto/passwd
-chmod 600 /etc/mosquitto/passwd
+chmod 644 /etc/mosquitto/passwd
+command -v restorecon >/dev/null 2>&1 && restorecon -F /etc/mosquitto/passwd 2>/dev/null || true
 
 echo "==> 3/6 定位发行版配置文件"
-# mosquitto 2.x 要求密码文件属主是 root（进程先以 root 读文件再降权）
 chown root:root /etc/mosquitto/passwd
-chmod 600 /etc/mosquitto/passwd
+chmod 644 /etc/mosquitto/passwd
 
 UNIT_CONF=$(systemctl cat mosquitto 2>/dev/null \
   | sed -n 's/.*-c \([^ ]*\).*/\1/p' | head -1)
