@@ -1,5 +1,6 @@
 // alarm-clock: composition root (init order + scheduling only)
 #include <Arduino.h>
+#include <LittleFS.h>
 #include <string.h>
 #include "config.h"
 #include "ui/ui.h"
@@ -13,6 +14,7 @@
 void setup() {
   Serial.begin(115200);
   delay(300);
+  LittleFS.begin(true);     // 先挂载，UI 开机要读背景图
   settings::begin();
   alarms::begin();
   Serial.printf("\n=== alarm-clock ===  city=%s\n", settings::cityName());
