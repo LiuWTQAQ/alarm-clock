@@ -160,24 +160,28 @@ def device_message(dev: str, kind: str, payload: dict):
         db("UPDATE devices SET online=?, last_seen=? WHERE id=?", (1 if on else 0, now, dev))
 
 
+def _mqtt_parts():
+    """mqtt://user:pass@host:1883  ->  (host, port, user, pass)"""
+    from urllib.parse import urlparse
+    u = urlparse(MQTT_URL)
+    return (u.hostname or "127.0.0.1", u.port or 1883,
+            u.username, u.password)
+
+
 def _mqtt_publish(topic, payload):
     import paho.mqtt.publish as publish
+    host, port, user, pwd = _mqtt_parts()
+    auth = {"username": user, "password": pwd} if user else None
     publish.single(topic, json.dumps(payload, ensure_ascii=False), qos=1,
-                   host=_mqtt_host(), port=_mqtt_port())
-
-
-def _mqtt_host():
-    return MQTT_URL.split("://")[-1].split(":")[0]
-
-
-def _mqtt_port():
-    parts = MQTT_URL.split("://")[-1].split(":")
-    return int(parts[1]) if len(parts) > 1 else 1883
+                   hostname=host, port=port, auth=auth)
 
 
 def mqtt_worker():
     import paho.mqtt.client as mqtt
     client = mqtt.Client(client_id="alarm-cloud")
+    host, port, user, pwd = _mqtt_parts()
+    if user:
+        client.username_pw_set(user, pwd)
 
     def on_message(_c, _u, msg):
         try:
@@ -189,7 +193,7 @@ def mqtt_worker():
             device_message(parts[1], parts[2], payload)
 
     client.on_message = on_message
-    client.connect(_mqtt_host(), _mqtt_port(), 30)
+    client.connect(host, port, 30)
     client.subscribe([("alarm/+/state", 1), ("alarm/+/event", 1),
                       ("alarm/+/ack", 1), ("alarm/+/online", 1)])
     client.loop_forever()

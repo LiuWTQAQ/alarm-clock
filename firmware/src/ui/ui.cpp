@@ -972,6 +972,17 @@ void setCity(const char* name) {
   if (s_page == P_HOME) drawWeatherCard();
 }
 
+const char* clockText() {
+  static char b[16];
+  if (s_timeOk) snprintf(b, sizeof(b), "%02d:%02d:%02d", s_h, s_m, s_s);
+  else          snprintf(b, sizeof(b), "--:--:--");
+  return b;
+}
+int         tempC()    { return s_temp; }
+const char* condText() { return s_cond; }
+int         aqi()      { return s_aqi; }
+void        redraw()   { drawCurrent(); }
+
 void setWeather(int tempC, const char* cond) {
   s_temp = tempC;
   s_cond = cond;

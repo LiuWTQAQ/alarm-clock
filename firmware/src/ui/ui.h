@@ -20,6 +20,13 @@ void tap(int x, int y);
 void back();
 void debugDumpClock();   // temporary: stream the clock sprite over serial
 void debugDumpScreen();
-void debugDumpFull();     // 320x240 hex dump for off-device inspection  // temporary: read the clock area back from the panel
+void debugDumpFull();
+
+// 供云端上报使用的只读访问器
+const char* clockText();   // "13:37:49"
+int         tempC();       // 当前温度（摄氏）
+const char* condText();    // "多云"
+int         aqi();         // -1 表示未知
+void        redraw();      // 重画当前页（设置变更后调用）     // 320x240 hex dump for off-device inspection  // temporary: read the clock area back from the panel
 
 }  // namespace ui

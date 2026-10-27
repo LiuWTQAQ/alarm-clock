@@ -7,6 +7,7 @@
 #include "net/net_time.h"
 #include "net/weather.h"
 #include "net/webcfg.h"
+#include "net/mqttc.h"
 #include "settings.h"
 #include "core/alarms.h"
 #include "holidays.h"
@@ -23,6 +24,7 @@ void setup() {
   ui::setCity(settings::cityName());
 
   net_time::begin();        // Wi-Fi + SNTP
+  mqttc::begin();           // 云端控制（未配置时自动跳过）
   weather::begin();         // first fetch ~2 s after boot
 }
 
@@ -64,6 +66,7 @@ static void debugKeys() {
 
 void loop() {
   net_time::loop();
+  mqttc::loop();
   debugKeys();
   weather::loop();
   if (net_time::connected() && !webcfg::started()) webcfg::begin();
