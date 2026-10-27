@@ -62,13 +62,17 @@ fi
 
 echo "== 5. 账号与连通性"
 if command -v mosquitto_sub >/dev/null 2>&1 && [ -n "${MQTT_URL:-}" ]; then
-  HOST=$(printf '%s' "$MQTT_URL" | sed -E 's#^[a-z]+://##; s#@.*##; s#:.*##')
-  PORT=$(printf '%s' "$MQTT_URL" | sed -nE 's#^[a-z]+://([^@]*@)?[^:]+:([0-9]+).*#\2#p'); PORT=${PORT:-1883}
-  USER=$(printf '%s' "$MQTT_URL" | sed -nE 's#^[a-z]+://([^:@]+)(:[^@]*)?@.*#\1#p')
-  PASS=$(printf '%s' "$MQTT_URL" | sed -nE 's#^[a-z]+://[^:]+:([^@]*)@.*#\1#p')
-  if mosquitto_pub -h "$HOST" -p "$PORT" ${USER:+-u "$USER"} ${PASS:+-P "$PASS"} \
+  read -r HOST PORT MQUSER MQPASS < <(printf '%s' "$MQTT_URL" | python3 -c '
+import sys, urllib.parse as u
+p = u.urlparse(sys.stdin.read().strip())
+print(p.hostname or "127.0.0.1", p.port or 1883, p.username or "", p.password or "")
+')
+  AUTH=()
+  [ -n "$MQUSER" ] && AUTH+=(-u "$MQUSER")
+  [ -n "$MQPASS" ] && AUTH+=(-P "$MQPASS")
+  if timeout 6 mosquitto_pub -h "$HOST" -p "$PORT" "${AUTH[@]}" \
         -t 'alarm/selfcheck' -m 'ping' -q 1 2>/dev/null; then
-    pass "用 $USER 连 $HOST:$PORT 发布成功"
+    pass "用 ${MQUSER:-匿名} 连 $HOST:$PORT 发布成功"
   else
     fail "连 $HOST:$PORT 失败（密码错？控制台没放行 1883？）"
   fi
