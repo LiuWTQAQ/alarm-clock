@@ -1,0 +1,7 @@
+[Unit]
+Description=Alarm clock database backup
+After=alarm.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /root/alarm-clock/deploy/backup.sh

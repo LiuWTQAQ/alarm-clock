@@ -16,6 +16,9 @@ struct Alarm {
 const int kMax = 5;
 
 void   begin();
+void   setAlarm(Alarm& a, uint8_t hour, uint8_t min, uint8_t mask, bool on, const char* label);
+void   replaceAll(const Alarm* list, int n);   // 云端下发整表（n 可为 0）
+bool   anyOn();                                // 是否有启用的闹钟
 int    count();
 Alarm* at(int i);
 int    add();                 // returns index of the new alarm

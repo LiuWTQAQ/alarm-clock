@@ -144,6 +144,25 @@ def bus_publish(topic: str, payload: dict):
         _queue.setdefault(dev, []).append({"topic": topic, "payload": payload})
 
 
+def _import_alarms(dev: str, items: list):
+    """设备端自己改过闹钟 -> 覆盖云端表（设备是唯一的编辑来源之一）。"""
+    items = [a for a in items if isinstance(a, dict)][:5]
+    cur = db("SELECT h,m,mask,on_,label FROM alarms WHERE dev=? ORDER BY id", (dev,)).fetchall()
+    # 设备刚上电还没收到 alarm.sync 时会先报空表，别用它把云端清空
+    if not items and cur:
+        return
+    incoming = [(int(a.get("h", 7)) % 24, int(a.get("m", 0)) % 60,
+                 int(a.get("mask", 0)) & 0x7F, 1 if a.get("on") else 0,
+                 str(a.get("label", ""))[:9]) for a in items]
+    if [tuple(r) for r in cur] == incoming:
+        return
+    db("DELETE FROM alarms WHERE dev=?", (dev,))
+    for i, (h, m, mask, on, label) in enumerate(incoming, 1):
+        db("INSERT INTO alarms(dev,id,h,m,mask,on_,label,snooze,snooze_min,ring) "
+           "VALUES(?,?,?,?,?,?,?,1,9,'')", (dev, i, h, m, mask, on, label))
+    print(f"[sync] device {dev} pushed {len(incoming)} alarm(s)")
+
+
 def device_message(dev: str, kind: str, payload: dict):
     """Device -> cloud, called by MQTT subscriber or by /api/sim/pub."""
     now = int(time.time())
@@ -152,6 +171,8 @@ def device_message(dev: str, kind: str, payload: dict):
            (json.dumps(payload, ensure_ascii=False), now,
             payload.get("rev", 0), dev))
         _online[dev] = True
+        if isinstance(payload.get("alarms"), list):
+            _import_alarms(dev, payload["alarms"])
     elif kind == "event":
         db("INSERT INTO events(dev,ts,type,payload) VALUES(?,?,?,?)",
            (dev, payload.get("ts", now), payload.get("type", "?"),

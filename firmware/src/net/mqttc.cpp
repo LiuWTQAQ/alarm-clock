@@ -13,6 +13,7 @@
 #include "ui/ui.h"
 #include "net/net_time.h"
 #include "net/weather.h"
+#include "core/alarms.h"
 
 namespace {
 WiFiClient   s_net;
@@ -28,7 +29,7 @@ char         s_err[48] = "";
 const uint32_t kStateEveryMs = 20000;
 
 void publishJson(const char* topic, JsonDocument& doc, bool retained = false) {
-  char buf[512];
+  char buf[1024];
   size_t n = serializeJson(doc, buf, sizeof(buf));
   s_mq.publish(topic, (const uint8_t*)buf, n, retained);
 }
@@ -58,7 +59,16 @@ void publishState() {
   d["clock"] = ui::clockText();
 
   JsonObject alarm = d["alarm"].to<JsonObject>();
-  alarm["on"] = true;
+  alarm["on"] = alarms::anyOn();
+  alarm["n"]  = alarms::count();
+
+  JsonArray arr = d["alarms"].to<JsonArray>();
+  for (int i = 0; i < alarms::count(); i++) {
+    alarms::Alarm* a = alarms::at(i);
+    JsonObject o = arr.add<JsonObject>();
+    o["h"] = a->hour; o["m"] = a->min; o["mask"] = a->mask;
+    o["on"] = a->on;  o["label"] = a->label;
+  }
 
   JsonObject light = d["light"].to<JsonObject>();
   light["on"] = s_light;
@@ -110,6 +120,22 @@ static void handleCmd(const char* json) {
     delay(80);
     net_time::setCredentials(ssid, pass);
     changed = true;
+  } else if (!strcmp(op, "alarm.sync")) {
+    alarms::Alarm tmp[alarms::kMax];
+    int n = 0;
+    for (JsonObject o : d["alarms"].as<JsonArray>()) {
+      if (n >= alarms::kMax) break;
+      const char* lb = o["label"] | "闹钟";
+      if (!*lb) lb = "闹钟";
+      alarms::setAlarm(tmp[n], (uint8_t)(o["h"] | 7), (uint8_t)(o["m"] | 0),
+                       (uint8_t)(o["mask"] | 0), o["on"] | true, lb);
+      n++;
+    }
+    alarms::replaceAll(tmp, n);
+    Serial.printf("[mqtt] alarm.sync n=%d\n", n);
+    sendAck(id, true, nullptr);
+    ui::redraw();
+    changed = true;
   } else if (!strcmp(op, "config.set")) {
     if (d["hour12"].is<bool>())     settings::setHour12(d["hour12"].as<bool>());
     if (d["fahrenheit"].is<bool>()) settings::setFahrenheit(d["fahrenheit"].as<bool>());
@@ -160,7 +186,7 @@ void begin() {
   s_mq.setClient(s_net);              // 必须先绑定底层连接，否则 connect() 空指针
   s_mq.setServer(MQTT_HOST, MQTT_PORT);
   s_mq.setCallback(onMessage);
-  s_mq.setBufferSize(768);          // 命令里带 alarms 数组也够用
+  s_mq.setBufferSize(1024);         // 命令/状态里带 alarms 数组也够用
   s_mq.setKeepAlive(30);
 }
 

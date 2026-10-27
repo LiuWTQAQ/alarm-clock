@@ -19,14 +19,12 @@ command -v mosquitto >/dev/null 2>&1 || { echo "!! 安装后仍找不到 mosquit
 echo "==> 2/6 生成密码文件"
 MOSQ_UID=$(id -u mosquitto 2>/dev/null || echo 0)
 mosquitto_passwd -b -c /etc/mosquitto/passwd "$MQ_USER" "$MQ_PASS"
-# 644：mosquitto 可能以非 root 身份读取（文件里是 PBKDF2 哈希，不是明文）
-chown root:root /etc/mosquitto/passwd
-chmod 644 /etc/mosquitto/passwd
+# 640 root:mosquitto：只有 root 和 broker 组能读（文件里是 PBKDF2 哈希）
+chown root:mosquitto /etc/mosquitto/passwd
+chmod 640 /etc/mosquitto/passwd
 command -v restorecon >/dev/null 2>&1 && restorecon -F /etc/mosquitto/passwd 2>/dev/null || true
 
 echo "==> 3/6 定位发行版配置文件"
-chown root:root /etc/mosquitto/passwd
-chmod 644 /etc/mosquitto/passwd
 
 UNIT_CONF=$(systemctl cat mosquitto 2>/dev/null \
   | sed -n 's/.*-c \([^ ]*\).*/\1/p' | head -1)
@@ -40,6 +38,8 @@ fi
 echo "==> 4/6 写入配置并重启"
 cat >"$UNIT_CONF" <<EOF
 # 由 deploy/install_mosquitto.sh 生成
+# root 启动后降权到 mosquitto，密码文件 640 root:mosquitto 才能读到
+user mosquitto
 per_listener_settings false
 listener 1883 0.0.0.0
 allow_anonymous false
@@ -57,6 +57,9 @@ systemctl daemon-reload
 systemctl enable mosquitto >/dev/null 2>&1 || true
 systemctl restart mosquitto
 sleep 1
+
+chown root:mosquitto /etc/mosquitto/passwd 2>/dev/null || true
+chmod 640 /etc/mosquitto/passwd 2>/dev/null || true
 
 echo "==> 5/6 放行本机防火墙（腾讯云控制台仍需手动放行 1883）"
 if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then

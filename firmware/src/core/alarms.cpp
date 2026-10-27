@@ -10,6 +10,8 @@ Alarm      s_a[kMax];
 int        s_n = 0;
 Preferences prefs;
 
+}  // namespace
+
 void setAlarm(Alarm& a, uint8_t h, uint8_t m, uint8_t mask, bool on, const char* label) {
   a.hour = h;
   a.min  = m;
@@ -18,6 +20,8 @@ void setAlarm(Alarm& a, uint8_t h, uint8_t m, uint8_t mask, bool on, const char*
   strncpy(a.label, label, sizeof(a.label) - 1);
   a.label[sizeof(a.label) - 1] = 0;
 }
+
+namespace {
 
 void defaults() {
   s_n = 1;
@@ -56,6 +60,21 @@ void removeAt(int i) {
   for (int k = i; k < s_n - 1; k++) s_a[k] = s_a[k + 1];
   s_n--;
   save();
+}
+
+void replaceAll(const Alarm* list, int n) {
+  if (n < 0) n = 0;
+  if (n > kMax) n = kMax;
+  s_n = n;
+  for (int i = 0; i < n; i++) setAlarm(s_a[i], list[i].hour % 24, list[i].min % 60,
+                                      list[i].mask, list[i].on, list[i].label);
+  save();
+  Serial.printf("[alm] replaced by cloud: %d alarm(s)\n", s_n);
+}
+
+bool anyOn() {
+  for (int i = 0; i < s_n; i++) if (s_a[i].on) return true;
+  return false;
 }
 
 void save() {
