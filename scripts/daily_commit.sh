@@ -66,18 +66,24 @@ fi
 HEAD_SHORT="$(git rev-parse --short HEAD)"
 echo "committed $HEAD_SHORT ($TOTALS)"
 
-# 推送；被拒时先 rebase 再重试一次
-if ! git push -q origin "$BRANCH"; then
-  echo "push rejected, trying pull --rebase"
-  if git pull -q --rebase origin "$BRANCH" && git push -q origin "$BRANCH"; then
-    echo "pushed after rebase"
+# 推送：GitHub(origin) 与 Gitee(gitee) 都要推，防止两边分叉
+PUSH_OK=""
+for REMOTE in origin gitee; do
+  git remote get-url "$REMOTE" >/dev/null 2>&1 || continue
+  if git push -q "$REMOTE" "$BRANCH"; then
+    PUSH_OK="$PUSH_OK $REMOTE"
   else
-    echo "ERROR: push failed, commit kept locally"
-    osascript -e 'display notification "推送失败，提交已保存在本地" with title "alarm-clock"' 2>/dev/null
-    exit 1
+    echo "push to $REMOTE rejected, trying pull --rebase"
+    if git pull -q --rebase "$REMOTE" "$BRANCH" && git push -q "$REMOTE" "$BRANCH"; then
+      PUSH_OK="$PUSH_OK $REMOTE(rebase)"
+    else
+      echo "ERROR: push to $REMOTE failed, commit kept locally"
+      osascript -e 'display notification "推送失败，提交已保存在本地" with title "alarm-clock"' 2>/dev/null
+      exit 1
+    fi
   fi
-fi
+done
 
-echo "pushed $HEAD_SHORT to origin/$BRANCH"
-osascript -e "display notification \"已提交 $HEAD_SHORT 到 GitHub\" with title \"alarm-clock\"" 2>/dev/null
+echo "pushed $HEAD_SHORT to$PUSH_OK ($BRANCH)"
+osascript -e "display notification \"已提交 $HEAD_SHORT 到 GitHub 与 Gitee\" with title \"alarm-clock\"" 2>/dev/null
 exit 0
