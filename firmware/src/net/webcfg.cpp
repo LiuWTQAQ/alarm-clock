@@ -24,13 +24,13 @@ body{font-family:-apple-system,system-ui,"Microsoft YaHei",sans-serif;background
 h1{font-size:19px;font-weight:600;margin:0 0 18px}
 .card{background:#171c24;border-radius:14px;padding:18px;margin-bottom:14px}
 label{font-size:13px;color:#8b96a5}
-select,input[type=file]{width:100%;box-sizing:border-box;padding:11px;margin-top:8px;border-radius:10px;border:1px solid #273140;background:#0f1319;color:#fff;font-size:15px}
+select,input[type=file],input[type=text],input[type=password]{width:100%;box-sizing:border-box;padding:11px;margin-top:8px;border-radius:10px;border:1px solid #273140;background:#0f1319;color:#fff;font-size:15px}
 button{margin-top:14px;width:100%;padding:12px;border:0;border-radius:10px;background:#2f81f7;color:#fff;font-size:16px}
 img{width:100%;border-radius:10px;margin-top:12px;background:#000}
 .note{font-size:12px;color:#7d8797;margin-top:10px;line-height:1.6}
 </style></head><body><h1>智能闹钟 · 设置</h1>
 <form class="card" method="POST" action="/wifi"><label>Wi-Fi 名称（SSID）</label>
-<input name="ssid" maxlength="32" value=")HTML";
+<input name="ssid" type="text" maxlength="32" value=")HTML";
 
 const char* MIDW = R"HTML(">
 <label style="display:block;margin-top:12px">Wi-Fi 密码</label>
@@ -47,7 +47,7 @@ const char* MID = R"HTML(</select><button>保存城市</button>
 <input type="file" name="f" accept="image/jpeg">
 <button>上传并应用</button>
 <div class="note">图片会按等比缩放铺满屏幕，并自动压暗一半以保证文字可读。上传后立即生效。</div>
-<img src="/bg.jpg" alt="当前背景">
+<img src="/bg.jpg" alt="当前背景" onerror="this.style.display='none'">
 <button formaction="/bg/clear" formmethod="get" style="background:#30363d">恢复默认背景</button></form>
 </body></html>)HTML";
 
