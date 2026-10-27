@@ -9,10 +9,19 @@ REL="$ROOT/releases/$STAMP"
 
 echo "==> 发布 $STAMP"
 mkdir -p "$REL" "$ROOT/data"
-rsync -a --delete \
-  --exclude .git --exclude .pio --exclude firmware/.pio --exclude node_modules \
-  --exclude '*.db' --exclude 'server/data.db' \
-  "$REPO/" "$REL/"
+
+copy_tree() {
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete \
+      --exclude .git --exclude .pio --exclude firmware/.pio --exclude node_modules \
+      --exclude '*.db' "$REPO/" "$REL/"
+  else
+    echo "    (no rsync, using cp)"
+    ( cd "$REPO" && tar -cf - --exclude .git --exclude .pio --exclude node_modules \
+        --exclude '*.db' . ) | ( cd "$REL" && tar -xf - )
+  fi
+}
+copy_tree
 
 if [ ! -x "$ROOT/venv/bin/uvicorn" ]; then
   echo "==> 首次创建虚拟环境"
