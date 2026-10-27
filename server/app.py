@@ -18,7 +18,11 @@ from pydantic import BaseModel
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import asr as asr_mod, intent as intent_mod
+try:                     # 语音模块依赖缺失时不影响主服务
+    import asr as asr_mod, intent as intent_mod
+except Exception as _e:  # pragma: no cover
+    asr_mod = intent_mod = None
+    print("[warn] voice module disabled:", _e)
 
 ROOT = Path(__file__).resolve().parent.parent
 DB = Path(os.environ.get("ALARM_DB", ROOT / "server" / "data.db"))

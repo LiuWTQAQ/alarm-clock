@@ -27,8 +27,9 @@ if [ ! -x "$ROOT/venv/bin/uvicorn" ]; then
   echo "==> 首次创建虚拟环境"
   python3 -m venv "$ROOT/venv"
   "$ROOT/venv/bin/pip" install -q --upgrade pip
-  "$ROOT/venv/bin/pip" install -q fastapi 'uvicorn[standard]' paho-mqtt
 fi
+# 每次发布都对齐依赖（已装好的会秒过）
+"$ROOT/venv/bin/pip" install -q -r "$REL/server/requirements.txt"
 
 # 数据文件放在 releases 之外，发布不会覆盖
 mkdir -p "$ROOT/data"
