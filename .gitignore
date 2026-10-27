@@ -19,3 +19,5 @@ node_modules/
 *.bin
 *.elf
 *.map
+server/data.db
+server/__pycache__/

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>闹钟 · 远程控制</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1 id="devName">卧室闹钟</h1>
+      <p class="sub"><span id="dot" class="dot"></span><span id="conn">连接中…</span></p>
+    </div>
+    <div class="clock"><span id="clock">--:--:--</span><small id="ampm"></small></div>
+  </header>
+
+  <section class="card env">
+    <div><b id="temp">--</b><small>°C</small></div>
+    <div class="muted" id="cond">—</div>
+    <div class="muted">空气 <span id="aqi">--</span></div>
+  </section>
+
+  <section class="card">
+    <div class="row head"><h2>闹钟</h2><button id="addBtn" class="ghost">+ 新增</button></div>
+    <ul id="alarms" class="list"></ul>
+  </section>
+
+  <section class="card">
+    <div class="row"><h2>灯</h2><button id="lamp" class="toggle off">关</button></div>
+    <p class="muted small">继电器 · 卧室顶灯</p>
+  </section>
+
+  <section class="card">
+    <div class="row"><h2>空调</h2><button id="ac" class="toggle off">关</button></div>
+    <div class="row acrow">
+      <button id="tmin" class="ghost">−</button>
+      <span id="actemp">26 °C</span>
+      <button id="tplus" class="ghost">+</button>
+    </div>
+    <p class="muted small">红外 · 房间空调</p>
+  </section>
+
+  <section class="card">
+    <h2>事件</h2>
+    <ul id="events" class="list muted small"></ul>
+  </section>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog" id="form">
+    <h3 id="dlgTitle">新增闹钟</h3>
+    <label>时间<input id="fTime" type="time" required></label>
+    <label>重复
+      <select id="fMask">
+        <option value="31">工作日</option>
+        <option value="127">每天</option>
+        <option value="96">周末</option>
+        <option value="0">一次</option>
+      </select>
+    </label>
+    <label>标签<input id="fLabel" maxlength="9" placeholder="起床"></label>
+    <menu><button value="cancel" class="ghost">取消</button><button id="save" value="default">保存</button></menu>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
