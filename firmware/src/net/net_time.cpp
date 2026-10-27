@@ -56,7 +56,15 @@ void net_time::begin() {
 }
 
 const char* net_time::ssid() {
-  return (WiFi.status() == WL_CONNECTED) ? WiFi.SSID().c_str() : s_ssid;
+  // 注意：WiFi.SSID() 返回临时 String，不能直接返回 c_str()（悬垂指针）
+  static char buf[33];
+  if (WiFi.status() == WL_CONNECTED) {
+    String s = WiFi.SSID();
+    strncpy(buf, s.c_str(), sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = 0;
+    return buf;
+  }
+  return s_ssid;
 }
 
 const char* net_time::pass() { return s_pass; }
