@@ -169,3 +169,15 @@ menu{display:flex;justify-content:flex-end;gap:10px;margin:18px 0 0;padding:0}
 @media (min-width:900px){
   .picker{align-items:center}
 }
+
+/* ---------------- logout button in the tab bar */
+#logout{
+  position:absolute; right:14px; top:50%; transform:translateY(-50%);
+  padding:6px 12px; border-radius:9px;
+  background:transparent; border:1px solid var(--line); color:var(--dim);
+  font:inherit; font-size:13px; cursor:pointer; transition:color .15s,border-color .15s;
+}
+#logout:hover{color:var(--text);border-color:#3a4152}
+@media (max-width:899px){
+  #logout{right:10px;padding:5px 10px;font-size:12.5px}
+}
