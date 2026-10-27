@@ -12,7 +12,8 @@ USER = os.environ.get("ALARM_USER", "LiuWT")
 PASS = os.environ.get("ALARM_PASS", "L0219")
 
 _jar = http.cookiejar.CookieJar()
-_opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(_jar))
+_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}),
+                                   urllib.request.HTTPCookieProcessor(_jar))  # 忽略系统代理
 _logged: dict = {"base": None}
 
 
@@ -81,6 +82,12 @@ class Device:
             elif cmd.get("key") == "temp":
                 self.ac["temp"] = max(16, min(30, self.ac["temp"] + 1))
             print(f"  <- ac.send {cmd.get('key')} -> {self.ac}")
+        elif op == "ac.set":
+            if "on" in cmd:
+                self.ac["on"] = bool(cmd.get("on"))
+            if "temp" in cmd:
+                self.ac["temp"] = max(16, min(30, int(cmd.get("temp"))))
+            print(f"  <- ac.set -> {self.ac}")
         elif op == "wifi.set":
             new = cmd.get("ssid") or ""
             if not new:

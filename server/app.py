@@ -16,6 +16,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import asr as asr_mod, intent as intent_mod
+
 ROOT = Path(__file__).resolve().parent.parent
 DB = Path(os.environ.get("ALARM_DB", ROOT / "server" / "data.db"))
 MQTT_URL = os.environ.get("MQTT_URL", "")
@@ -368,6 +372,49 @@ async def cmd(dev: str, body: dict):
         "sent", body["ts"]))
     bus_publish(f"alarm/{dev}/cmd", body)
     return {"id": body["id"], "status": "sent"}
+
+
+@app.post("/api/voice")
+async def voice(request: Request, dev: str = DEV, execute: bool = True):
+    """上传一段 wav（body 原始字节），识别 -> 解析意图 -> 可选下发命令。
+
+    返回 {text, intent, params, reply, command, timing}
+    """
+    wav = await request.body()
+    if len(wav) < 1000:
+        raise HTTPException(400, "audio too short")
+    if len(wav) > 1_500_000:
+        raise HTTPException(413, "audio too large")
+    try:
+        r = asr_mod.recognize(wav)
+    except asr_mod.AsrError as e:
+        raise HTTPException(502, f"asr failed: {e}")
+    parsed = intent_mod.parse(r["text"])
+    out = {"text": r["text"], "intent": None, "params": {}, "reply": None,
+           "command": None, "asr_ms": r["cost_ms"], "audio_ms": r["duration_ms"]}
+    if not parsed:
+        out["reply"] = "没听懂，请再说一遍"
+        return out
+    intent, params, reply = parsed
+    if intent == "query.time" and not reply:
+        reply = time.strftime("现在是 %H:%M", time.localtime())
+    elif intent == "query.weather" and not reply:
+        row = db("SELECT state FROM devices WHERE id=?", (dev,)).fetchone()
+        st = json.loads(row["state"]) if row and row["state"] else {}
+        env = st.get("env") or {}
+        if env.get("temp") is not None:
+            reply = f"现在 {env.get('temp')} 度，{env.get('cond', '')}".strip()
+        else:
+            reply = "还没拿到天气数据"
+    out.update(intent=intent, params=params, reply=reply)
+    cmd = intent_mod.to_command(intent, params)
+    if cmd and execute:
+        cmd.update({"id": str(uuid.uuid4()), "ts": int(time.time())})
+        db("INSERT INTO commands VALUES(?,?,?,?,?,?)",
+           (cmd["id"], dev, cmd["op"], json.dumps(cmd, ensure_ascii=False), "sent", cmd["ts"]))
+        bus_publish(f"alarm/{dev}/cmd", cmd)
+        out["command"] = cmd
+    return out
 
 
 @app.get("/api/devices/{dev}/events")
