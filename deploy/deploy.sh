@@ -32,6 +32,7 @@ fi
 
 # 数据文件放在 releases 之外，发布不会覆盖
 mkdir -p "$ROOT/data"
+rm -f "$REL/server/data.db"
 ln -sfn "$ROOT/data/app.db" "$REL/server/data.db" 2>/dev/null || true
 
 ln -sfn "$REL" "$ROOT/current.new" && mv -Tf "$ROOT/current.new" "$ROOT/current"

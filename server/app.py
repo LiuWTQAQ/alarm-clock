@@ -83,7 +83,9 @@ def init():
            (DEV, "卧室闹钟", "{}"))
         for i, (h, m, mask, on, label) in enumerate(
                 [(7, 30, 0x1F, 1, "起床"), (8, 10, 0x60, 0, "周末")], start=1):
-            db("INSERT INTO alarms VALUES(?,?,?,?,?,?,?)", (DEV, i, h, m, mask, on, label))
+            db("INSERT INTO alarms(dev,id,h,m,mask,on_,label,snooze,snooze_min,ring)"
+               " VALUES(?,?,?,?,?,?,?,?,?,?)",
+               (DEV, i, h, m, mask, on, label, 1, 9, "故事时间"))
 
 
 # ---------------------------------------------------------------- auth

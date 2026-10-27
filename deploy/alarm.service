@@ -9,6 +9,7 @@ User=alarm
 Group=alarm
 WorkingDirectory=/opt/alarm/current
 Environment=PORT=8001
+Environment=ALARM_DB=/opt/alarm/data/app.db
 Environment=ALARM_PROD=1
 # 生产环境务必改掉默认密码：
 # Environment=ALARM_PASS=换成你的强密码
