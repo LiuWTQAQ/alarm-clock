@@ -50,6 +50,15 @@ namespace mqttc {
 bool online() { return s_mq.connected(); }
 const char* lastError() { return s_err; }
 
+static long weatherEpoch() {
+  unsigned long ms = weather::lastUpdate();
+  if (!ms) return 0;
+  time_t now = time(nullptr);
+  if (now < 1600000000) return 0;      // 还没对上时间
+  long ago = (long)((millis() - ms) / 1000);
+  return (long)now - ago;
+}
+
 void publishState() {
   if (!s_mq.connected()) return;
   JsonDocument d;
@@ -81,6 +90,8 @@ void publishState() {
   env["t"] = ui::tempC();
   env["cond"] = ui::condText();
   env["aqi"] = ui::aqi();
+  env["city"] = settings::cityName();
+  env["ts"] = weatherEpoch();          // 最近一次成功抓取天气的时间（epoch 秒）
 
   JsonObject net = d["net"].to<JsonObject>();
   net["rssi"] = WiFi.RSSI();
@@ -140,6 +151,14 @@ static void handleCmd(const char* json) {
     if (d["hour12"].is<bool>())     settings::setHour12(d["hour12"].as<bool>());
     if (d["fahrenheit"].is<bool>()) settings::setFahrenheit(d["fahrenheit"].as<bool>());
     if (d["lang"].is<const char*>()) settings::setLang(strcmp(d["lang"], "en") == 0 ? 1 : 0);
+    if (d["city"].is<const char*>()) {
+      int idx = settings::findCity(d["city"]);
+      if (idx >= 0 && idx != settings::cityIndex()) {
+        settings::setCityIndex(idx);
+        Serial.printf("[mqtt] city -> %s\n", settings::cityName());
+        weather::restart();
+      }
+    }
     sendAck(id, true, nullptr);
     ui::redraw();
     changed = true;

@@ -80,6 +80,13 @@ void setCityIndex(int i) {
 
 const char* cityName()        { return kCities[s_idx].name; }
 
+int findCity(const char* name) {
+  if (!name || !*name) return -1;
+  for (int i = 0; i < kN; i++)
+    if (!strcmp(kCities[i].name, name)) return i;
+  return -1;
+}
+
 bool hour12()          { return s_hour12; }
 void setHour12(bool v) {
   s_hour12 = v;

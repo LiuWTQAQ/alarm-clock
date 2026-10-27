@@ -59,7 +59,7 @@ class Device:
             "alarm": {"on": True, "ringing": False},
             "alarms": self.alarms,
             "light": self.light, "ac": self.ac,
-            "env": {"t": 16, "h": 67, "aqi": 98, "cond": "阴"},
+            "env": {"t": 16, "h": 67, "aqi": 98, "cond": "阴", "city": "上海", "ts": int(time.time())},
             "net": {"rssi": -62, "ip": "192.168.31.173", "ssid": self.ssid},
         }
         payload["clock"] = "%02d:%02d:%02d" % (now.tm_hour, now.tm_min, now.tm_sec)

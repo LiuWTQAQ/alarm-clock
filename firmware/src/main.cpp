@@ -86,6 +86,14 @@ void loop() {
     ui::tick(t);
   }
 
+  // city may change from the cloud; keep the card in sync
+  static char lastCity[24] = "";
+  if (strcmp(lastCity, settings::cityName())) {
+    strncpy(lastCity, settings::cityName(), sizeof(lastCity) - 1);
+    ui::setCity(lastCity);
+    Serial.printf("[ui] city %s\n", lastCity);
+  }
+
   // weather, only when it actually changes
   static int  lastTemp = -999;
   static int  lastAqi  = -999;

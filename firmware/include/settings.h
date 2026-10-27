@@ -16,6 +16,7 @@ int         cityCount();
 const City& cityAt(int i);
 int         cityIndex();
 void        setCityIndex(int i);
+int         findCity(const char* name);   // -1 when unknown
 const char* cityName();
 float       lat();
 float       lon();

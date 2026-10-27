@@ -10,6 +10,8 @@ const I18N = {
     sec_net:'网络', ssid:'Wi-Fi 名称（SSID）', wpass:'Wi-Fi 密码',
     wifi_save:'保存到设备', need_ssid:'请先填写 SSID',
     sent:'已下发，设备正在重连…',
+    auto_hint:'修改后立即下发到设备', pushall:'重新下发全部设置',
+    wx_updated:'天气更新', wx_never:'天气尚未更新', mins_ago:(m)=>`${m} 分钟前`,
     wifi_hint:'下发后设备会断开并重连，约 5–10 秒。填错时可在设备本地页面（屏幕上的 IP）改回。', online:(w)=>w ? `在线 · ${w}` : '在线', offline:'离线（使用本地闹钟）',
     down:'服务未启动', air:(n)=>`空气 ${n}`,
     lamp:'灯', lamp_hint:'继电器 · 卧室顶灯', ac:'空调', ac_hint:'红外 · 房间空调',
@@ -38,6 +40,8 @@ const I18N = {
     sec_net:'Network', ssid:'Wi-Fi SSID', wpass:'Wi-Fi password',
     wifi_save:'Push to device', need_ssid:'SSID is required',
     sent:'Pushed, the device is reconnecting…',
+    auto_hint:'Changes are pushed immediately', pushall:'Push all settings again',
+    wx_updated:'Weather updated', wx_never:'Weather not fetched yet', mins_ago:(m)=>`${m} min ago`,
     wifi_hint:'The device drops and reconnects, about 5–10 s. If it fails, fix it on the device\'s local page (the IP shown on screen).', online:(w)=>w ? `Online · ${w}` : 'Online', offline:'Offline (local alarms)',
     down:'Service unavailable', air:(n)=>`AQI ${n}`,
     lamp:'Light', lamp_hint:'Relay · bedroom ceiling light', ac:'AC', ac_hint:'IR · room air conditioner',
@@ -222,7 +226,8 @@ function paintState(s) {
   $('#temp').textContent = v == null ? '--' : (f ? Math.round(v * 9 / 5 + 32) : v);
   $('#unit').textContent = f ? '°F' : '°C';
   $('#cond').textContent = condText(s.cond || s.env?.cond);
-  $('#place').textContent = `${settings.city ?? '—'} · ${tf('air', s.env?.aqi ?? '--')}`;
+  $('#place').textContent = `${s.env?.city || settings.city || '—'} · ${tf('air', s.env?.aqi ?? '--')}`;
+  paintWxTime(s.env?.ts);
   const lampOn = !!s.light?.on;
   $('#lamp').className = 'toggle ' + (lampOn ? 'on' : 'off');
   $('#lamp').textContent = lampOn ? t('on') : t('off');
@@ -273,6 +278,18 @@ async function refresh() {
   } catch { $('#conn').textContent = t('down'); }
 }
 
+/* weather timestamp from the device */
+function paintWxTime(ts) {
+  const el = $('#wxTime'); if (!el) return;
+  if (!ts) { el.textContent = t('wx_never'); return; }
+  const d = new Date(ts * 1000);
+  const p = n => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+                `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  const mins = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
+  el.textContent = `${t('wx_updated')}: ${stamp} · ${tf('mins_ago', mins)}`;
+}
+
 /* ---------------------------------------------------------------- settings */
 async function loadSettings() {
   try { settings = await api(`/api/devices/${DEV}/settings`); } catch { settings = {}; }
@@ -298,7 +315,13 @@ $('#sLang').addEventListener('change', () => {
   lang = $('#sLang').value; localStorage.setItem('lang', lang); applyLang(); refresh();
 });
 
-$('#saveSettings').onclick = async () => {
+let saveTimer = 0;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveSettings, 350);
+}
+
+async function saveSettings() {
   const body = {
     city: $('#sCity').value, tz: $('#sTz').value,
     hour12: $('#sHour').value === '12', fahrenheit: $('#sUnit').value === 'f',
@@ -315,7 +338,14 @@ $('#saveSettings').onclick = async () => {
       ? tf('saved_push', pushed.join(lang === 'en' ? ', ' : '、')) : t('saved_same');
     paintClock(); refresh();
   } catch (e) { $('#saveHint').textContent = tf('save_fail', e.message); }
-};
+}
+
+$('#saveSettings').onclick = saveSettings;
+['#sCity', '#sTz', '#sHour', '#sUnit', '#sWx', '#sLang'].forEach(sel => {
+  $(sel).addEventListener('change', scheduleSave);
+});
+$('#sName').addEventListener('change', scheduleSave);
+$('#sName').addEventListener('blur', scheduleSave);
 
 /* ---------------------------------------------------------------- wheel */
 function buildWheel(el, count, init) {
