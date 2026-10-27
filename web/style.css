@@ -6,7 +6,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text)}
 body{font:15px/1.55 -apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
-     padding-bottom:76px}
+     padding-bottom:96px}
 h1{font-size:18px;margin:0}
 h2{font-size:14px;margin:0;letter-spacing:.3px;color:var(--dim);font-weight:600}
 .muted{color:var(--dim)} .small{font-size:13px}
