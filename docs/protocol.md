@@ -132,3 +132,14 @@
 
 - OTA：`alarm/{devId}/ota` 主题 + 分片校验（v0.3 之后）。
 - 多设备：`/api/devices` 已按列表设计，界面暂只展示一台。
+
+## 配置下发
+
+偏好设置（城市、时区、时间格式、温度单位、刷新间隔）由网页写入云端，再以 `config.set` 下发：
+
+```json
+{"id":"<uuid>","op":"config.set","ts":1793000000,
+ "city":"上海","tz":"Asia/Shanghai","hour12":true,"fahrenheit":true}
+```
+
+设备收到后写 NVS（`cfg` 命名空间），无需重启即可生效；只下发**变化**的字段。

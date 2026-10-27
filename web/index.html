@@ -3,48 +3,120 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08080a">
 <title>闹钟 · 远程控制</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<nav class="tabs">
+  <a href="#/" class="tab" data-view="home">主页</a>
+  <a href="#/settings" class="tab" data-view="settings">设置</a>
+</nav>
+
 <main>
-  <header>
-    <div>
-      <h1 id="devName">卧室闹钟</h1>
-      <p class="sub"><span id="dot" class="dot"></span><span id="conn">连接中…</span></p>
+  <!-- ------------------------------------------------ home -->
+  <section id="view-home" class="view">
+    <header class="hero">
+      <div>
+        <h1 id="devName">卧室闹钟</h1>
+        <p class="sub"><span id="dot" class="dot"></span><span id="conn">连接中…</span></p>
+      </div>
+      <div class="clock"><span id="clock">--:--:--</span><small id="ampm"></small></div>
+    </header>
+
+    <div class="grid">
+      <div class="col">
+        <section class="card env">
+          <div class="temp"><b id="temp">--</b><small id="unit">°C</small></div>
+          <div class="muted" id="cond">—</div>
+          <div class="muted small" id="place">成都 · 空气 --</div>
+        </section>
+
+        <section class="card">
+          <div class="row head"><h2>灯</h2><button id="lamp" class="toggle off">关</button></div>
+          <p class="muted small">继电器 · 卧室顶灯</p>
+        </section>
+
+        <section class="card">
+          <div class="row head"><h2>空调</h2><button id="ac" class="toggle off">关</button></div>
+          <div class="row acrow">
+            <button id="tmin" class="ghost">−</button>
+            <span id="actemp">26 °C</span>
+            <button id="tplus" class="ghost">+</button>
+          </div>
+          <p class="muted small">红外 · 房间空调</p>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="card">
+          <div class="row head"><h2>闹钟</h2><button id="addBtn" class="ghost">+ 新增</button></div>
+          <ul id="alarms" class="list"></ul>
+        </section>
+
+        <section class="card">
+          <h2>事件</h2>
+          <ul id="events" class="list muted small"></ul>
+        </section>
+      </div>
     </div>
-    <div class="clock"><span id="clock">--:--:--</span><small id="ampm"></small></div>
-  </header>
-
-  <section class="card env">
-    <div><b id="temp">--</b><small>°C</small></div>
-    <div class="muted" id="cond">—</div>
-    <div class="muted">空气 <span id="aqi">--</span></div>
   </section>
 
-  <section class="card">
-    <div class="row head"><h2>闹钟</h2><button id="addBtn" class="ghost">+ 新增</button></div>
-    <ul id="alarms" class="list"></ul>
-  </section>
+  <!-- ------------------------------------------------ settings -->
+  <section id="view-settings" class="view">
+    <header class="hero">
+      <div>
+        <h1>设置</h1>
+        <p class="sub">偏好保存在云端，并下发到设备</p>
+      </div>
+    </header>
 
-  <section class="card">
-    <div class="row"><h2>灯</h2><button id="lamp" class="toggle off">关</button></div>
-    <p class="muted small">继电器 · 卧室顶灯</p>
-  </section>
+    <div class="grid">
+      <div class="col">
+        <section class="card form">
+          <h2>位置与时间</h2>
+          <label>城市（决定天气）
+            <select id="sCity"></select>
+          </label>
+          <label>时区
+            <select id="sTz"></select>
+          </label>
+          <label>时间格式
+            <select id="sHour">
+              <option value="24">24 小时制</option>
+              <option value="12">12 小时制</option>
+            </select>
+          </label>
+        </section>
+      </div>
 
-  <section class="card">
-    <div class="row"><h2>空调</h2><button id="ac" class="toggle off">关</button></div>
-    <div class="row acrow">
-      <button id="tmin" class="ghost">−</button>
-      <span id="actemp">26 °C</span>
-      <button id="tplus" class="ghost">+</button>
+      <div class="col">
+        <section class="card form">
+          <h2>显示</h2>
+          <label>温度单位
+            <select id="sUnit">
+              <option value="c">摄氏度 °C</option>
+              <option value="f">华氏度 °F</option>
+            </select>
+          </label>
+          <label>天气刷新间隔
+            <select id="sWx">
+              <option value="10">10 分钟</option>
+              <option value="30">30 分钟</option>
+              <option value="60">60 分钟</option>
+            </select>
+          </label>
+          <label>设备名称
+            <input id="sName" maxlength="12" placeholder="卧室闹钟">
+          </label>
+        </section>
+
+        <section class="card">
+          <button id="saveSettings" class="primary">保存并下发</button>
+          <p class="muted small" id="saveHint"></p>
+        </section>
+      </div>
     </div>
-    <p class="muted small">红外 · 房间空调</p>
-  </section>
-
-  <section class="card">
-    <h2>事件</h2>
-    <ul id="events" class="list muted small"></ul>
   </section>
 </main>
 

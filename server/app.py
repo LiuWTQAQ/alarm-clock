@@ -47,6 +47,9 @@ def init():
             id INTEGER PRIMARY KEY AUTOINCREMENT, dev TEXT, ts INT, type TEXT, payload TEXT)""")
     db("""CREATE TABLE IF NOT EXISTS commands(
             id TEXT PRIMARY KEY, dev TEXT, op TEXT, payload TEXT, status TEXT, ts INT)""")
+    cols = [r["name"] for r in _conn.execute("PRAGMA table_info(devices)").fetchall()]
+    if "settings" not in cols:
+        db("ALTER TABLE devices ADD COLUMN settings TEXT DEFAULT '{}'")
     if not _conn.execute("SELECT 1 FROM devices WHERE id=?", (DEV,)).fetchone():
         db("INSERT INTO devices(id,name,online,rev,state,last_seen) VALUES(?,?,0,0,?,0)",
            (DEV, "卧室闹钟", "{}"))
@@ -122,6 +125,12 @@ def mqtt_worker():
     client.loop_forever()
 
 
+DEFAULT_SETTINGS = {
+    "name": "卧室闹钟", "city": "成都", "tz": "Asia/Shanghai",
+    "hour12": True, "fahrenheit": False, "wx_interval": 30,
+}
+
+
 # ---------------------------------------------------------------- models
 class AlarmIn(BaseModel):
     h: int
@@ -147,6 +156,37 @@ def state(dev: str):
     st["rev"] = row["rev"]
     st["online"] = bool(row["online"]) and (time.time() - row["last_seen"] < 30)
     return st
+
+
+@app.get("/api/devices/{dev}/settings")
+def get_settings(dev: str):
+    row = db("SELECT settings FROM devices WHERE id=?", (dev,)).fetchone()
+    if not row:
+        raise HTTPException(404, "device not found")
+    st = dict(DEFAULT_SETTINGS)
+    st.update(json.loads(row["settings"] or "{}"))
+    return st
+
+
+@app.put("/api/devices/{dev}/settings")
+async def put_settings(dev: str, body: dict):
+    row = db("SELECT settings FROM devices WHERE id=?", (dev,)).fetchone()
+    if not row:
+        raise HTTPException(404, "device not found")
+    cur = dict(DEFAULT_SETTINGS)
+    cur.update(json.loads(row["settings"] or "{}"))
+    changed = {k: body[k] for k in body if k in DEFAULT_SETTINGS and body[k] != cur.get(k)}
+    cur.update(changed)
+    db("UPDATE devices SET settings=? WHERE id=?",
+       (json.dumps(cur, ensure_ascii=False), dev))
+    if "name" in changed:
+        db("UPDATE devices SET name=? WHERE id=?", (str(changed["name"])[:12], dev))
+    if changed:
+        cmd = {"id": str(uuid.uuid4()), "op": "config.set", "ts": int(time.time()), **changed}
+        db("INSERT INTO commands VALUES(?,?,?,?,?,?)",
+           (cmd["id"], dev, "config.set", json.dumps(cmd, ensure_ascii=False), "sent", cmd["ts"]))
+        bus_publish(f"alarm/{dev}/cmd", cmd)
+    return {"settings": cur, "pushed": changed}
 
 
 @app.get("/api/devices/{dev}/alarms")
