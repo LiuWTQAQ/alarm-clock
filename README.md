@@ -257,6 +257,21 @@ board_build.arduino.memory_type = qio_opi
 | P7 | 云端 REST + MQTT + H5 | 待开始 |
 | P8 | 联调、断网测试、外壳 | 待开始 |
 
+## 远程仓库（两个）
+
+| 名称 | 地址 | 用途 |
+|---|---|---|
+| `origin` | `git@github.com:LiuWTQAQ/alarm-clock.git` | GitHub，备份与展示 |
+| `gitee` | `git@gitee.com:LiuWT-Yoshino/alarm-clock.git` | 腾讯云服务器从这个地址拉取 |
+
+两边必须同步，否则会出现“Gitee 有、GitHub 没有”。日常提交：
+
+```bash
+git add -A && git commit -m "..." && git sync   # 一次推到两个远端
+```
+
+`git sync` 是仓库内配置的别名（依次 push origin、push gitee）；每日自动提交脚本也会同时推两个远端。
+
 ## 9. 开发规范
 
 - **提交**：一个逻辑改动一次 commit，信息用 `feat/fix/docs/chore(scope): 描述`；里程碑打 tag（`v0.2-display`）。
