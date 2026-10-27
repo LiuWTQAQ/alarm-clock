@@ -439,7 +439,7 @@ $('#rRepeat').onclick = () => {
     const b = document.createElement('button');
     b.className = 'row tap';
     b.innerHTML = `<span>${t(key)}</span><b>${mask === editing.mask ? '✓' : ''}</b>`;
-    b.onclick = () => { editing.mask = mask; syncRepeat(); openPicker(t('repeat')); };
+    b.onclick = () => { editing.mask = mask; syncRepeat(); };
     body.append(b);
   }
   const days = document.createElement('div');
