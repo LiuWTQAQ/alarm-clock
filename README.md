@@ -1,3 +1,5 @@
+[**中文**](README.md) · [English](README.en.md)
+
 # 基于 ESP32-S3 的云端互联智能闹钟与本地控制网关
 
 > 本科毕业设计 · 西南交通大学—利兹学院 · 2026–2027
@@ -16,7 +18,7 @@
 
 ## 页面与交互
 
-屏幕共四个页面，互为主从关系：
+屏幕有多个页面，主从关系如下（完整列表见文末「界面与交互」）：
 
 ```
 主页 ──点天气卡──▶ 天气详情 ──点空白/返回──▶ 主页
@@ -339,7 +341,7 @@ http://alarm.local/             # mDNS 名字（部分路由器不转发 .local�
 
 ## 分区表
 
-`partitions.csv` 把 8 MB Flash 划成：app 3 MB + LittleFS 960 KB（`spiffs` 标签）。
+`partitions.csv` 把 16 MB Flash 划成：app 3 MB + LittleFS 10 MB（`spiffs` 标签）。
 改动过分区表后，第一次烧录前建议先 `pio run -t erase`，否则旧的文件系统数据可能对不上。
 
 ## 字体
