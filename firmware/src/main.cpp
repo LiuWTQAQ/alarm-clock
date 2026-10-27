@@ -19,6 +19,7 @@ void setup() {
   settings::begin();
   alarms::begin();
   Serial.printf("\n=== alarm-clock ===  city=%s\n", settings::cityName());
+  Serial.printf("[boot] psram total %u B, free %u B\n", ESP.getPsramSize(), ESP.getFreePsram());
 
   ui::begin();              // screen first, so we have feedback even without Wi-Fi
   ui::setCity(settings::cityName());
@@ -46,6 +47,7 @@ static void debugKeys() {
     Serial.printf("[mem] free %u B (%.1f KB), min %u B, largest block %u B\n",
                   ESP.getFreeHeap(), ESP.getFreeHeap() / 1024.0,
                   ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
+    Serial.printf("[mem] psram total %u B, free %u B\n", ESP.getPsramSize(), ESP.getFreePsram());
     break;
   case 'H': {
     const int t[5][3] = {{2026,10,26},{2026,10,1},{2026,9,20},{2026,10,10},{2026,5,4}};
