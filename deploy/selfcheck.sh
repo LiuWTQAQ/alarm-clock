@@ -87,9 +87,16 @@ rows = con.execute("SELECT id,name,online,last_seen,rev FROM devices").fetchall(
 if not rows:
     print("  ! 还没有设备记录（设备从没连过云端）")
 for r in rows:
-    ago = int(time.time()) - (r["last_seen"] or 0)
     state = "在线" if r["online"] else "离线"
-    print(f"  · {r['id']} {r['name'] or ''}   {state}   last_seen {ago}s 前   rev {r['rev']}")
+    ls = r["last_seen"] or 0
+    if not ls:
+        ago = "从未上报"
+    else:
+        d = max(0, int(time.time()) - ls)
+        ago = (f"{d}s 前" if d < 120 else
+               f"{d//60} 分钟前" if d < 7200 else
+               f"{d//3600} 小时前" if d < 86400 else f"{d//86400} 天前")
+    print(f"  · {r['id']} {r['name'] or ''}   {state}   最后上报 {ago}   rev {r['rev']}")
 PY
 else
   warn "找不到 $DB"
