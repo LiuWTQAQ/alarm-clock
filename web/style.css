@@ -52,6 +52,8 @@ button{cursor:pointer;font:inherit}
 .ghost{background:transparent;border:1px solid var(--line);color:var(--text);border-radius:9px;padding:6px 12px;font-size:13px}
 .primary{width:100%;border:0;border-radius:12px;padding:13px;font-size:15px;font-weight:600;
          color:#04222a;background:var(--acc)}
+.primary.mini{width:auto;padding:9px 22px;border-radius:10px}
+menu .primary{width:auto}
 .acrow{gap:16px;margin-top:10px;justify-content:flex-start}
 #actemp{font-size:20px;width:96px;text-align:center}
 

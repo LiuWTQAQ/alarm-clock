@@ -127,7 +127,7 @@ def mqtt_worker():
 
 DEFAULT_SETTINGS = {
     "name": "卧室闹钟", "city": "成都", "tz": "Asia/Shanghai",
-    "hour12": True, "fahrenheit": False, "wx_interval": 30,
+    "hour12": True, "fahrenheit": False, "wx_interval": 30, "lang": "zh",
 }
 
 

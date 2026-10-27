@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#08080a">
-<title>闹钟 · 远程控制</title>
+<title data-i18n="title">闹钟 · 远程控制</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <nav class="tabs">
-  <a href="#/" class="tab" data-view="home">主页</a>
-  <a href="#/settings" class="tab" data-view="settings">设置</a>
+  <a href="#/" class="tab" data-view="home" data-i18n="tab_home">主页</a>
+  <a href="#/settings" class="tab" data-view="settings" data-i18n="tab_settings">设置</a>
 </nav>
 
 <main>
@@ -19,7 +19,7 @@
     <header class="hero">
       <div>
         <h1 id="devName">卧室闹钟</h1>
-        <p class="sub"><span id="dot" class="dot"></span><span id="conn">连接中…</span></p>
+        <p class="sub"><span id="dot" class="dot"></span><span id="conn" data-i18n="connecting">连接中…</span></p>
       </div>
       <div class="clock"><span id="clock">--:--:--</span><small id="ampm"></small></div>
     </header>
@@ -29,33 +29,34 @@
         <section class="card env">
           <div class="temp"><b id="temp">--</b><small id="unit">°C</small></div>
           <div class="muted" id="cond">—</div>
-          <div class="muted small" id="place">成都 · 空气 --</div>
+          <div class="muted small" id="place"></div>
         </section>
 
         <section class="card">
-          <div class="row head"><h2>灯</h2><button id="lamp" class="toggle off">关</button></div>
-          <p class="muted small">继电器 · 卧室顶灯</p>
+          <div class="row head"><h2 data-i18n="lamp">灯</h2><button id="lamp" class="toggle off">关</button></div>
+          <p class="muted small" data-i18n="lamp_hint">继电器 · 卧室顶灯</p>
         </section>
 
         <section class="card">
-          <div class="row head"><h2>空调</h2><button id="ac" class="toggle off">关</button></div>
+          <div class="row head"><h2 data-i18n="ac">空调</h2><button id="ac" class="toggle off">关</button></div>
           <div class="row acrow">
             <button id="tmin" class="ghost">−</button>
             <span id="actemp">26 °C</span>
             <button id="tplus" class="ghost">+</button>
           </div>
-          <p class="muted small">红外 · 房间空调</p>
+          <p class="muted small" data-i18n="ac_hint">红外 · 房间空调</p>
         </section>
       </div>
 
       <div class="col">
         <section class="card">
-          <div class="row head"><h2>闹钟</h2><button id="addBtn" class="ghost">+ 新增</button></div>
+          <div class="row head"><h2 data-i18n="alarms">闹钟</h2>
+            <button id="addBtn" class="ghost" data-i18n="add">+ 新增</button></div>
           <ul id="alarms" class="list"></ul>
         </section>
 
         <section class="card">
-          <h2>事件</h2>
+          <h2 data-i18n="events">事件</h2>
           <ul id="events" class="list muted small"></ul>
         </section>
       </div>
@@ -66,25 +67,31 @@
   <section id="view-settings" class="view">
     <header class="hero">
       <div>
-        <h1>设置</h1>
-        <p class="sub">偏好保存在云端，并下发到设备</p>
+        <h1 data-i18n="settings">设置</h1>
+        <p class="sub" data-i18n="settings_sub">偏好保存在云端，并下发到设备</p>
       </div>
     </header>
 
     <div class="grid">
       <div class="col">
         <section class="card form">
-          <h2>位置与时间</h2>
-          <label>城市（决定天气）
+          <h2 data-i18n="sec_loc">位置与时间</h2>
+          <label><span data-i18n="city">城市（决定天气）</span>
             <select id="sCity"></select>
           </label>
-          <label>时区
+          <label><span data-i18n="tz">时区</span>
             <select id="sTz"></select>
           </label>
-          <label>时间格式
+          <label><span data-i18n="hourfmt">时间格式</span>
             <select id="sHour">
-              <option value="24">24 小时制</option>
-              <option value="12">12 小时制</option>
+              <option value="24" data-i18n="h24">24 小时制</option>
+              <option value="12" data-i18n="h12">12 小时制</option>
+            </select>
+          </label>
+          <label><span data-i18n="lang">语言</span>
+            <select id="sLang">
+              <option value="zh">中文</option>
+              <option value="en">English</option>
             </select>
           </label>
         </section>
@@ -92,27 +99,27 @@
 
       <div class="col">
         <section class="card form">
-          <h2>显示</h2>
-          <label>温度单位
+          <h2 data-i18n="sec_disp">显示</h2>
+          <label><span data-i18n="unit">温度单位</span>
             <select id="sUnit">
-              <option value="c">摄氏度 °C</option>
-              <option value="f">华氏度 °F</option>
+              <option value="c" data-i18n="uc">摄氏度 °C</option>
+              <option value="f" data-i18n="uf">华氏度 °F</option>
             </select>
           </label>
-          <label>天气刷新间隔
+          <label><span data-i18n="wx">天气刷新间隔</span>
             <select id="sWx">
-              <option value="10">10 分钟</option>
-              <option value="30">30 分钟</option>
-              <option value="60">60 分钟</option>
+              <option value="10" data-i18n="m10">10 分钟</option>
+              <option value="30" data-i18n="m30">30 分钟</option>
+              <option value="60" data-i18n="m60">60 分钟</option>
             </select>
           </label>
-          <label>设备名称
-            <input id="sName" maxlength="12" placeholder="卧室闹钟">
+          <label><span data-i18n="name">设备名称</span>
+            <input id="sName" maxlength="12">
           </label>
         </section>
 
         <section class="card">
-          <button id="saveSettings" class="primary">保存并下发</button>
+          <button id="saveSettings" class="primary" data-i18n="save">保存并下发</button>
           <p class="muted small" id="saveHint"></p>
         </section>
       </div>
@@ -121,19 +128,22 @@
 </main>
 
 <dialog id="dlg">
-  <form method="dialog" id="form">
+  <form id="form">
     <h3 id="dlgTitle">新增闹钟</h3>
-    <label>时间<input id="fTime" type="time" required></label>
-    <label>重复
+    <label><span data-i18n="time">时间</span><input id="fTime" type="time" required></label>
+    <label><span data-i18n="repeat">重复</span>
       <select id="fMask">
-        <option value="31">工作日</option>
-        <option value="127">每天</option>
-        <option value="96">周末</option>
-        <option value="0">一次</option>
+        <option value="31" data-i18n="r_work">工作日</option>
+        <option value="127" data-i18n="r_daily">每天</option>
+        <option value="96" data-i18n="r_weekend">周末</option>
+        <option value="0" data-i18n="r_once">一次</option>
       </select>
     </label>
-    <label>标签<input id="fLabel" maxlength="9" placeholder="起床"></label>
-    <menu><button value="cancel" class="ghost">取消</button><button id="save" value="default">保存</button></menu>
+    <label><span data-i18n="label">标签</span><input id="fLabel" maxlength="9" placeholder="起床"></label>
+    <menu>
+      <button type="button" id="dlgCancel" class="ghost" data-i18n="cancel">取消</button>
+      <button type="submit" id="dlgSave" class="primary mini" data-i18n="save_short">保存</button>
+    </menu>
   </form>
 </dialog>
 

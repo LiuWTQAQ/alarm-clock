@@ -139,7 +139,9 @@
 
 ```json
 {"id":"<uuid>","op":"config.set","ts":1793000000,
- "city":"上海","tz":"Asia/Shanghai","hour12":true,"fahrenheit":true}
+ "city":"上海","tz":"Asia/Shanghai","hour12":true,"fahrenheit":true,"lang":"zh"}
 ```
 
 设备收到后写 NVS（`cfg` 命名空间），无需重启即可生效；只下发**变化**的字段。
+
+`lang` 取值 `zh` / `en`，设备侧映射为 `cfg/lang` 的 `0` / `1`（0=中文，1=英文）。

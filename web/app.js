@@ -2,27 +2,116 @@ const DEV = 'a943f8';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
+/* ---------------------------------------------------------------- i18n */
+const I18N = {
+  zh: {
+    title:'闹钟 · 远程控制', tab_home:'主页', tab_settings:'设置',
+    connecting:'连接中…', online:(r)=>`在线 · 信号 ${r} dBm`, offline:'离线（使用本地闹钟）',
+    down:'服务未启动', air:(n)=>`空气 ${n}`,
+    lamp:'灯', lamp_hint:'继电器 · 卧室顶灯', ac:'空调', ac_hint:'红外 · 房间空调',
+    on:'开', off:'关', alarms:'闹钟', add:'+ 新增', events:'事件',
+    no_alarms:'还没有闹钟', no_events:'暂无事件',
+    r_once:'一次', r_work:'工作日', r_weekend:'周末', r_daily:'每天', r_custom:'自定义',
+    edit:'改', del:'删', settings:'设置', settings_sub:'偏好保存在云端，并下发到设备',
+    sec_loc:'位置与时间', city:'城市（决定天气）', tz:'时区', hourfmt:'时间格式',
+    h24:'24 小时制', h12:'12 小时制', lang:'语言',
+    sec_disp:'显示', unit:'温度单位', uc:'摄氏度 °C', uf:'华氏度 °F',
+    wx:'天气刷新间隔', m10:'10 分钟', m30:'30 分钟', m60:'60 分钟', name:'设备名称',
+    save:'保存并下发', saving:'保存中…',
+    saved_push:(x)=>`已保存，下发到设备：${x}`, saved_same:'已保存（与设备一致，无需下发）',
+    save_fail:(e)=>`保存失败：${e}`,
+    dlg_new:'新增闹钟', dlg_edit:'编辑闹钟', time:'时间', repeat:'重复', label:'标签',
+    cancel:'取消', save_short:'保存',
+    placeholder_label:'起床',
+  },
+  en: {
+    title:'Alarm Clock · Remote', tab_home:'Home', tab_settings:'Settings',
+    connecting:'Connecting…', online:(r)=>`Online · ${r} dBm`, offline:'Offline (local alarms)',
+    down:'Service unavailable', air:(n)=>`AQI ${n}`,
+    lamp:'Light', lamp_hint:'Relay · bedroom ceiling light', ac:'AC', ac_hint:'IR · room air conditioner',
+    on:'On', off:'Off', alarms:'Alarms', add:'+ Add', events:'Events',
+    no_alarms:'No alarms yet', no_events:'No events yet',
+    r_once:'Once', r_work:'Weekdays', r_weekend:'Weekend', r_daily:'Daily', r_custom:'Custom',
+    edit:'Edit', del:'Del', settings:'Settings', settings_sub:'Saved in the cloud and pushed to the device',
+    sec_loc:'Location & time', city:'City (drives weather)', tz:'Time zone', hourfmt:'Time format',
+    h24:'24-hour', h12:'12-hour', lang:'Language',
+    sec_disp:'Display', unit:'Temperature unit', uc:'Celsius °C', uf:'Fahrenheit °F',
+    wx:'Weather refresh', m10:'10 min', m30:'30 min', m60:'60 min', name:'Device name',
+    save:'Save & push', saving:'Saving…',
+    saved_push:(x)=>`Saved, pushed: ${x}`, saved_same:'Saved (already in sync)',
+    save_fail:(e)=>`Save failed: ${e}`,
+    dlg_new:'New alarm', dlg_edit:'Edit alarm', time:'Time', repeat:'Repeat', label:'Label',
+    cancel:'Cancel', save_short:'Save',
+    placeholder_label:'Wake up',
+  },
+};
+
 const CITIES = [
-  ['北京','Asia/Shanghai'],['上海','Asia/Shanghai'],['广州','Asia/Shanghai'],['深圳','Asia/Shanghai'],
-  ['成都','Asia/Shanghai'],['重庆','Asia/Shanghai'],['杭州','Asia/Shanghai'],['南京','Asia/Shanghai'],
-  ['武汉','Asia/Shanghai'],['西安','Asia/Shanghai'],['天津','Asia/Shanghai'],['苏州','Asia/Shanghai'],
-  ['长沙','Asia/Shanghai'],['郑州','Asia/Shanghai'],['青岛','Asia/Shanghai'],['大连','Asia/Shanghai'],
-  ['厦门','Asia/Shanghai'],['昆明','Asia/Shanghai'],['哈尔滨','Asia/Shanghai'],['乌鲁木齐','Asia/Shanghai'],
-  ['香港','Asia/Hong_Kong'],['台北','Asia/Taipei'],['东京','Asia/Tokyo'],['首尔','Asia/Seoul'],
-  ['新加坡','Asia/Singapore'],['曼谷','Asia/Bangkok'],['迪拜','Asia/Dubai'],['伦敦','Europe/London'],
-  ['巴黎','Europe/Paris'],['柏林','Europe/Berlin'],['莫斯科','Europe/Moscow'],['纽约','America/New_York'],
-  ['芝加哥','America/Chicago'],['洛杉矶','America/Los_Angeles'],['悉尼','Australia/Sydney'],
+  ['北京','Asia/Shanghai','Beijing'],['上海','Asia/Shanghai','Shanghai'],
+  ['广州','Asia/Shanghai','Guangzhou'],['深圳','Asia/Shanghai','Shenzhen'],
+  ['成都','Asia/Shanghai','Chengdu'],['重庆','Asia/Shanghai','Chongqing'],
+  ['杭州','Asia/Shanghai','Hangzhou'],['南京','Asia/Shanghai','Nanjing'],
+  ['武汉','Asia/Shanghai','Wuhan'],['西安','Asia/Shanghai',"Xi'an"],
+  ['天津','Asia/Shanghai','Tianjin'],['苏州','Asia/Shanghai','Suzhou'],
+  ['长沙','Asia/Shanghai','Changsha'],['郑州','Asia/Shanghai','Zhengzhou'],
+  ['青岛','Asia/Shanghai','Qingdao'],['大连','Asia/Shanghai','Dalian'],
+  ['厦门','Asia/Shanghai','Xiamen'],['昆明','Asia/Shanghai','Kunming'],
+  ['哈尔滨','Asia/Shanghai','Harbin'],['乌鲁木齐','Asia/Shanghai','Urumqi'],
+  ['香港','Asia/Hong_Kong','Hong Kong'],['台北','Asia/Taipei','Taipei'],
+  ['东京','Asia/Tokyo','Tokyo'],['首尔','Asia/Seoul','Seoul'],
+  ['新加坡','Asia/Singapore','Singapore'],['曼谷','Asia/Bangkok','Bangkok'],
+  ['迪拜','Asia/Dubai','Dubai'],['伦敦','Europe/London','London'],
+  ['巴黎','Europe/Paris','Paris'],['柏林','Europe/Berlin','Berlin'],
+  ['莫斯科','Europe/Moscow','Moscow'],['纽约','America/New_York','New York'],
+  ['芝加哥','America/Chicago','Chicago'],['洛杉矶','America/Los_Angeles','Los Angeles'],
+  ['悉尼','Australia/Sydney','Sydney'],
 ];
 
-const TZS = ['Asia/Shanghai','Asia/Hong_Kong','Asia/Taipei','Asia/Tokyo','Asia/Seoul','Asia/Singapore',
-  'Asia/Bangkok','Asia/Dubai','Asia/Kolkata','Europe/London','Europe/Paris','Europe/Berlin',
-  'Europe/Moscow','America/New_York','America/Chicago','America/Denver','America/Los_Angeles',
-  'America/Sao_Paulo','Australia/Sydney','Pacific/Auckland','UTC'];
-
-const MASK_TEXT = {0:'一次', 31:'工作日', 96:'周末', 127:'每天'};
-const rep = m => MASK_TEXT[m] || '自定义';
+const TZ_LABEL = {
+  zh: {
+    'Asia/Shanghai':'中国标准时间（UTC+8）', 'Asia/Hong_Kong':'香港时间（UTC+8）',
+    'Asia/Taipei':'台北时间（UTC+8）', 'Asia/Tokyo':'日本标准时间（UTC+9）',
+    'Asia/Seoul':'韩国标准时间（UTC+9）', 'Asia/Singapore':'新加坡时间（UTC+8）',
+    'Asia/Bangkok':'曼谷时间（UTC+7）', 'Asia/Dubai':'迪拜时间（UTC+4）',
+    'Asia/Kolkata':'印度标准时间（UTC+5:30）', 'Europe/London':'英国时间（UTC+0/+1）',
+    'Europe/Paris':'中欧时间（UTC+1/+2）', 'Europe/Berlin':'中欧时间（UTC+1/+2）',
+    'Europe/Moscow':'莫斯科时间（UTC+3）', 'America/New_York':'美国东部时间（UTC-5/-4）',
+    'America/Chicago':'美国中部时间（UTC-6/-5）', 'America/Denver':'美国山地时间（UTC-7/-6）',
+    'America/Los_Angeles':'美国太平洋时间（UTC-8/-7）', 'America/Sao_Paulo':'巴西时间（UTC-3）',
+    'Australia/Sydney':'悉尼时间（UTC+10/+11）', 'Pacific/Auckland':'新西兰时间（UTC+12/+13）',
+    'UTC':'协调世界时（UTC）',
+  },
+  en: {
+    'Asia/Shanghai':'China Standard Time (UTC+8)', 'Asia/Hong_Kong':'Hong Kong Time (UTC+8)',
+    'Asia/Taipei':'Taipei Time (UTC+8)', 'Asia/Tokyo':'Japan Standard Time (UTC+9)',
+    'Asia/Seoul':'Korea Standard Time (UTC+9)', 'Asia/Singapore':'Singapore Time (UTC+8)',
+    'Asia/Bangkok':'Indochina Time (UTC+7)', 'Asia/Dubai':'Gulf Time (UTC+4)',
+    'Asia/Kolkata':'India Standard Time (UTC+5:30)', 'Europe/London':'UK Time (UTC+0/+1)',
+    'Europe/Paris':'Central European Time (UTC+1/+2)', 'Europe/Berlin':'Central European Time (UTC+1/+2)',
+    'Europe/Moscow':'Moscow Time (UTC+3)', 'America/New_York':'US Eastern Time (UTC-5/-4)',
+    'America/Chicago':'US Central Time (UTC-6/-5)', 'America/Denver':'US Mountain Time (UTC-7/-6)',
+    'America/Los_Angeles':'US Pacific Time (UTC-8/-7)', 'America/Sao_Paulo':'Brasília Time (UTC-3)',
+    'Australia/Sydney':'Sydney Time (UTC+10/+11)', 'Pacific/Auckland':'New Zealand Time (UTC+12/+13)',
+    'UTC':'Coordinated Universal Time',
+  },
+};
+const TZS = Object.keys(TZ_LABEL.zh);
 
 let state = {}, settings = {}, editing = null, view = 'home';
+let lang = localStorage.getItem('lang') || 'zh';
+const t = k => I18N[lang][k];
+const tf = (k, ...a) => { const v = I18N[lang][k]; return typeof v === 'function' ? v(...a) : v; };
+
+const COND_EN = {
+  '晴':'Clear','多云':'Partly cloudy','阴':'Overcast','小雨':'Light rain','中雨':'Rain',
+  '大雨':'Heavy rain','暴雨':'Storm','雷阵雨':'Thunderstorm','雷雨':'Thunderstorm',
+  '小雪':'Light snow','中雪':'Snow','大雪':'Heavy snow','雾':'Fog','霾':'Haze',
+  '沙尘':'Dust','浮尘':'Dust','阵雨':'Showers','阵雪':'Snow showers','冻雨':'Freezing rain',
+  '少云':'Mostly clear',
+};
+const condText = s => lang === 'en' ? (COND_EN[s] || s || '—') : (s || '—');
+
+const repText = m => ({0:'r_once',31:'r_work',96:'r_weekend',127:'r_daily'}[m] || 'r_custom');
 
 async function api(path, opts = {}) {
   const r = await fetch(path, {headers: {'Content-Type': 'application/json'}, ...opts});
@@ -30,17 +119,42 @@ async function api(path, opts = {}) {
   return r.json();
 }
 
-/* ---------------------------------------------------------- routing */
+/* ---------------------------------------------------------------- i18n apply */
+function applyLang() {
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  document.title = t('title');
+  $$('[data-i18n]').forEach(el => {
+    const k = el.dataset.i18n;
+    if (I18N[lang][k] !== undefined && typeof I18N[lang][k] === 'string') el.textContent = t(k);
+  });
+  $('#fLabel').placeholder = t('placeholder_label');
+  buildSelects();
+  paintClock();
+  if (state.online !== undefined) paintState(state);
+}
+
+function buildSelects() {
+  const city = $('#sCity').value || settings.city || '成都';
+  const tzv = $('#sTz').value || settings.tz || 'Asia/Shanghai';
+  $('#sCity').innerHTML = CITIES
+    .map(([zh, tz, en]) => `<option value="${zh}">${lang === 'en' ? en : zh}</option>`).join('');
+  $('#sTz').innerHTML = TZS
+    .map(z => `<option value="${z}">${(TZ_LABEL[lang][z] || z)}</option>`).join('');
+  $('#sCity').value = city;
+  $('#sTz').value = tzv;
+}
+
+/* ---------------------------------------------------------------- routing */
 function route() {
   view = location.hash === '#/settings' ? 'settings' : 'home';
   $('#view-home').hidden = view !== 'home';
   $('#view-settings').hidden = view !== 'settings';
-  $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+  $$('.tab').forEach(el => el.classList.toggle('active', el.dataset.view === view));
   if (view === 'settings') loadSettings();
 }
 window.addEventListener('hashchange', route);
 
-/* ---------------------------------------------------------- clock */
+/* ---------------------------------------------------------------- clock */
 function paintClock() {
   const now = new Date();
   const p = n => String(n).padStart(2, '0');
@@ -51,54 +165,54 @@ function paintClock() {
 }
 setInterval(paintClock, 1000);
 
-/* ---------------------------------------------------------- home */
+/* ---------------------------------------------------------------- home */
 function paintState(s) {
   state = s;
   $('#dot').className = 'dot' + (s.online ? ' on' : '');
-  $('#conn').textContent = s.online ? `在线 · 信号 ${s.net?.rssi ?? '--'} dBm` : '离线（使用本地闹钟）';
+  $('#conn').textContent = s.online ? tf('online', s.net?.rssi ?? '--') : t('offline');
   const f = !!settings.fahrenheit;
-  const t = s.env?.t;
-  $('#temp').textContent = t == null ? '--' : (f ? Math.round(t * 9 / 5 + 32) : t);
+  const v = s.env?.t;
+  $('#temp').textContent = v == null ? '--' : (f ? Math.round(v * 9 / 5 + 32) : v);
   $('#unit').textContent = f ? '°F' : '°C';
-  $('#cond').textContent = s.cond || (s.env?.cond ?? '—');
-  $('#place').textContent = `${settings.city ?? '—'} · 空气 ${s.env?.aqi ?? '--'}`;
+  $('#cond').textContent = condText(s.cond || s.env?.cond);
+  $('#place').textContent = `${settings.city ?? '—'} · ${tf('air', s.env?.aqi ?? '--')}`;
   const lampOn = !!s.light?.on;
   $('#lamp').className = 'toggle ' + (lampOn ? 'on' : 'off');
-  $('#lamp').textContent = lampOn ? '开' : '关';
+  $('#lamp').textContent = lampOn ? t('on') : t('off');
   const acOn = !!s.ac?.on;
   $('#ac').className = 'toggle ' + (acOn ? 'on' : 'off');
-  $('#ac').textContent = acOn ? '开' : '关';
+  $('#ac').textContent = acOn ? t('on') : t('off');
   $('#actemp').textContent = `${s.ac?.temp ?? 26} °C`;
 }
 
 function paintAlarms(rows) {
   const ul = $('#alarms');
   ul.innerHTML = '';
-  if (!rows.length) { ul.innerHTML = '<li class="muted">还没有闹钟</li>'; return; }
+  if (!rows.length) { ul.innerHTML = `<li class="muted">${t('no_alarms')}</li>`; return; }
   for (const a of rows) {
     const li = document.createElement('li');
     const hh = settings.hour12 ? (a.h % 12 || 12) : String(a.h).padStart(2, '0');
-    li.innerHTML = `<span class="time">${hh}:${String(a.m).padStart(2,'0')}${
+    li.innerHTML = `<span class="time">${hh}:${String(a.m).padStart(2, '0')}${
       settings.hour12 ? `<small class="muted"> ${a.h < 12 ? 'AM' : 'PM'}</small>` : ''}</span>
-      <span class="rep">${a.label || ''} ${rep(a.mask)}</span>`;
-    const t = document.createElement('button');
-    t.className = 'toggle ' + (a.on ? 'on' : 'off');
-    t.textContent = a.on ? '开' : '关';
-    t.onclick = async () => {
+      <span class="rep">${a.label || ''} ${t(repText(a.mask))}</span>`;
+    const tg = document.createElement('button');
+    tg.className = 'toggle ' + (a.on ? 'on' : 'off');
+    tg.textContent = a.on ? t('on') : t('off');
+    tg.onclick = async () => {
       await api(`/api/devices/${DEV}/alarms/${a.id}`, {method: 'PUT', body: JSON.stringify(
         {h: a.h, m: a.m, mask: a.mask, on: !a.on, label: a.label})});
       refresh();
     };
-    const edit = document.createElement('button');
-    edit.className = 'ghost'; edit.textContent = '改';
-    edit.onclick = () => openDialog(a);
-    const del = document.createElement('button');
-    del.className = 'ghost'; del.textContent = '删';
-    del.onclick = async () => {
+    const ed = document.createElement('button');
+    ed.className = 'ghost'; ed.textContent = t('edit');
+    ed.onclick = () => openDialog(a);
+    const dl = document.createElement('button');
+    dl.className = 'ghost'; dl.textContent = t('del');
+    dl.onclick = async () => {
       await api(`/api/devices/${DEV}/alarms/${a.id}`, {method: 'DELETE'});
       refresh();
     };
-    li.append(t, edit, del);
+    li.append(tg, ed, dl);
     ul.append(li);
   }
 }
@@ -111,33 +225,41 @@ async function refresh() {
     if (devs[0]) $('#devName').textContent = devs[0].name;
     paintState(s); paintAlarms(alarms);
     const ev = await api(`/api/devices/${DEV}/events?limit=6`);
-    $('#events').innerHTML = ev.map(e =>
-      `<li>${new Date(e.ts * 1000).toLocaleTimeString()} · ${e.type}</li>`).join('')
-      || '<li>暂无事件</li>';
-  } catch { $('#conn').textContent = '服务未启动'; }
+    $('#events').innerHTML = ev.length
+      ? ev.map(e => `<li>${new Date(e.ts * 1000).toLocaleTimeString()} · ${e.type}</li>`).join('')
+      : `<li>${t('no_events')}</li>`;
+  } catch { $('#conn').textContent = t('down'); }
 }
 
-/* ---------------------------------------------------------- settings */
+/* ---------------------------------------------------------------- settings */
 async function loadSettings() {
-  try {
-    settings = await api(`/api/devices/${DEV}/settings`);
-  } catch { settings = {}; }
-  if (!$('#sCity').options.length) {
-    $('#sCity').innerHTML = CITIES.map(([c]) => `<option>${c}</option>`).join('');
-    $('#sTz').innerHTML = TZS.map(t => `<option>${t}</option>`).join('');
+  try { settings = await api(`/api/devices/${DEV}/settings`); } catch { settings = {}; }
+  if (settings.lang === 'zh' || settings.lang === 'en') {
+    lang = settings.lang;
+    localStorage.setItem('lang', lang);
+    applyLang();
   }
+  buildSelects();
   $('#sCity').value = settings.city ?? '成都';
   $('#sTz').value = settings.tz ?? 'Asia/Shanghai';
   $('#sHour').value = settings.hour12 ? '12' : '24';
   $('#sUnit').value = settings.fahrenheit ? 'f' : 'c';
   $('#sWx').value = String(settings.wx_interval ?? 30);
+  $('#sLang').value = lang;
   $('#sName').value = settings.name ?? $('#devName').textContent;
-  paintClock(); paintState(state); 
 }
 
 $('#sCity').addEventListener('change', () => {
   const hit = CITIES.find(([c]) => c === $('#sCity').value);
   if (hit) $('#sTz').value = hit[1];
+});
+
+$('#sLang').addEventListener('change', () => {
+  lang = $('#sLang').value;
+  localStorage.setItem('lang', lang);
+  applyLang();
+  paintAlarms(state.alarms || []);
+  refresh();
 });
 
 $('#saveSettings').onclick = async () => {
@@ -148,42 +270,51 @@ $('#saveSettings').onclick = async () => {
     fahrenheit: $('#sUnit').value === 'f',
     wx_interval: Number($('#sWx').value),
     name: $('#sName').value.trim() || '卧室闹钟',
+    lang,
   };
-  $('#saveHint').textContent = '保存中…';
+  $('#saveHint').textContent = t('saving');
   try {
     const r = await api(`/api/devices/${DEV}/settings`, {method: 'PUT', body: JSON.stringify(body)});
-    $('#devName').textContent = r.settings.name;
     settings = r.settings;
+    $('#devName').textContent = r.settings.name;
     const pushed = Object.keys(r.pushed || {});
     $('#saveHint').textContent = pushed.length
-      ? `已保存，下发到设备：${pushed.join('、')}`
-      : '已保存（与设备一致，无需下发）';
-    paintClock(); paintAlarms(await api(`/api/devices/${DEV}/alarms`));
+      ? tf('saved_push', pushed.join(lang === 'en' ? ', ' : '、'))
+      : t('saved_same');
+    paintClock();
+    paintAlarms(await api(`/api/devices/${DEV}/alarms`));
   } catch (e) {
-    $('#saveHint').textContent = '保存失败：' + e.message;
+    $('#saveHint').textContent = tf('save_fail', e.message);
   }
 };
 
-/* ---------------------------------------------------------- alarms dialog */
+/* ---------------------------------------------------------------- dialog */
 function openDialog(a) {
   editing = a || null;
-  $('#dlgTitle').textContent = a ? '编辑闹钟' : '新增闹钟';
-  $('#fTime').value = a ? `${String(a.h).padStart(2,'0')}:${String(a.m).padStart(2,'0')}` : '07:30';
-  $('#fMask').value = a ? a.mask : 31;
+  $('#dlgTitle').textContent = a ? t('dlg_edit') : t('dlg_new');
+  $('#fTime').value = a ? `${String(a.h).padStart(2, '0')}:${String(a.m).padStart(2, '0')}` : '07:30';
+  $('#fMask').value = String(a ? a.mask : 31);
   $('#fLabel').value = a?.label || '';
+  $('#fLabel').placeholder = t('placeholder_label');
   $('#dlg').showModal();
 }
+
+$('#dlgCancel').onclick = () => { editing = null; $('#dlg').close(); };
 
 $('#form').addEventListener('submit', async e => {
   e.preventDefault();
   const [h, m] = $('#fTime').value.split(':').map(Number);
-  const body = {h, m, mask: Number($('#fMask').value), on: true, label: $('#fLabel').value.slice(0, 9)};
+  const body = {h, m, mask: Number($('#fMask').value), on: true,
+                label: $('#fLabel').value.slice(0, 9)};
   if (editing) await api(`/api/devices/${DEV}/alarms/${editing.id}`, {method: 'PUT', body: JSON.stringify(body)});
   else await api(`/api/devices/${DEV}/alarms`, {method: 'POST', body: JSON.stringify(body)});
-  editing = null; refresh();
+  editing = null;
+  $('#dlg').close();
+  refresh();
 });
 
 $('#addBtn').onclick = () => openDialog(null);
+
 $('#lamp').onclick = async () => {
   await api(`/api/devices/${DEV}/cmd`, {method: 'POST',
     body: JSON.stringify({op: 'light.set', on: !state.light?.on})});
@@ -202,9 +333,16 @@ const bump = async d => {
 $('#tmin').onclick = () => bump(-1);
 $('#tplus').onclick = () => bump(+1);
 
-/* ---------------------------------------------------------- boot */
+/* ---------------------------------------------------------------- boot */
 (async function boot() {
-  try { settings = await api(`/api/devices/${DEV}/settings`); } catch {}
+  try {
+    settings = await api(`/api/devices/${DEV}/settings`);
+    if (settings.lang === 'zh' || settings.lang === 'en') {
+      lang = settings.lang;
+      localStorage.setItem('lang', lang);
+    }
+  } catch {}
+  applyLang();
   route();
   paintClock();
   refresh();
