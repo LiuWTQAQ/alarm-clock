@@ -8,6 +8,8 @@ Tencent Cloud host); without it the service runs an in-process bus so the
 web UI and tools/sim_device.py can be exercised on a laptop.
 """
 import hashlib, hmac, json, os, secrets, sqlite3, threading, time, uuid
+
+import requests
 from pathlib import Path
 from typing import Optional
 
@@ -122,7 +124,7 @@ def current_user(request: Request) -> Optional[str]:
     return row["user"]
 
 
-PUBLIC = {"/api/login", "/api/health"}
+PUBLIC = {"/api/login", "/api/health", "/api/weather"}
 
 
 @app.middleware("http")
@@ -290,6 +292,75 @@ def me(request: Request):
 @app.get("/api/health")
 def health():
     return {"ok": True, "ts": int(time.time())}
+
+
+# ---------------------------------------------------------------- weather proxy
+# 设备只发一次请求，云端合并「forecast + 空气质量」并按坐标缓存 30 分钟。
+# 返回结构与 open-meteo forecast 一致，额外多一个 air 字段，设备端解析代码不用变。
+WX_TTL = 1800
+_wx_cache = {}      # (lat, lon) -> (ts, payload)
+_wx_hits = {}       # ip -> [count, window_start]
+
+
+def _wx_rate_ok(ip: str) -> bool:
+    now = time.time()
+    c = _wx_hits.get(ip)
+    if not c or now - c[1] > 60:
+        _wx_hits[ip] = [1, now]
+        return True
+    c[0] += 1
+    return c[0] <= 60
+
+
+@app.get("/api/weather")
+def api_weather(request: Request, lat: float, lon: float):
+    if not _wx_rate_ok(request.client.host if request.client else "?"):
+        raise HTTPException(429, "too many requests")
+
+    key = (round(lat, 3), round(lon, 3))
+    now = time.time()
+    hit = _wx_cache.get(key)
+    if hit and now - hit[0] < WX_TTL:
+        payload = dict(hit[1])
+        payload["cached"] = True
+        return payload
+
+    try:
+        fc = requests.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude": lat, "longitude": lon,
+                "current": "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code",
+                "daily": "weather_code,temperature_2m_max,temperature_2m_min",
+                "forecast_days": 4, "timezone": "Asia/Shanghai",
+            },
+            timeout=8,
+        )
+        fc.raise_for_status()
+        doc = fc.json()
+    except Exception as e:
+        raise HTTPException(502, f"forecast upstream failed: {e}")
+
+    try:
+        aq = requests.get(
+            "https://air-quality-api.open-meteo.com/v1/air-quality",
+            params={"latitude": lat, "longitude": lon,
+                    "current": "us_aqi,pm2_5,pm10", "timezone": "Asia/Shanghai"},
+            timeout=8,
+        )
+        aq.raise_for_status()
+        doc["air"] = aq.json().get("current", {})
+    except Exception:
+        doc["air"] = {}
+
+    doc["cached"] = False
+    _wx_cache[key] = (now, doc)
+    if len(_wx_cache) > 200:
+        cutoff = now - WX_TTL
+        for k, v in list(_wx_cache.items()):
+            if v[0] < cutoff:
+                _wx_cache.pop(k, None)
+    return doc
 
 
 # ---------------------------------------------------------------- REST

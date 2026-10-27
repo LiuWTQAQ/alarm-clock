@@ -62,19 +62,12 @@ void applyCond() {
   s_cond = codeToText(s_code);
 }
 
-bool fetchWeather() {
+bool fetchAqi();
+
+bool httpGetJson(const char* url, JsonDocument& doc) {
   WiFiClientSecure client;
   client.setInsecure();
   HTTPClient http;
-
-  char url[300];
-  snprintf(url, sizeof(url),
-           "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
-           "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code"
-           "&daily=weather_code,temperature_2m_max,temperature_2m_min"
-           "&forecast_days=4&timezone=Asia%%2FShanghai",
-           (double)settings::lat(), (double)settings::lon());
-
   if (!http.begin(client, url)) { Serial.println("[wx] begin failed"); return false; }
   http.setTimeout(8000);
   int httpCode = http.GET();
@@ -85,10 +78,29 @@ bool fetchWeather() {
   }
   String body = http.getString();
   http.end();
-
-  JsonDocument doc;
   DeserializationError err = deserializeJson(doc, body);
   if (err) { Serial.printf("[wx] json %s\n", err.c_str()); return false; }
+  return true;
+}
+
+bool fetchWeather() {
+  char url[320];
+  JsonDocument doc;
+
+  // 首选云端代理：一次请求拿到天气 + 空气质量，云端按坐标缓存 30 分钟
+  snprintf(url, sizeof(url), CLOUD_BASE "/api/weather?lat=%.4f&lon=%.4f",
+           (double)settings::lat(), (double)settings::lon());
+  if (!httpGetJson(url, doc)) {
+    // 云端不可用时退回直连，保证断网/服务器故障时天气还能用
+    Serial.println("[wx] cloud failed, direct");
+    snprintf(url, sizeof(url),
+             "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
+             "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code"
+             "&daily=weather_code,temperature_2m_max,temperature_2m_min"
+             "&forecast_days=4&timezone=Asia%%2FShanghai",
+             (double)settings::lat(), (double)settings::lon());
+    if (!httpGetJson(url, doc)) return false;
+  }
 
   JsonObject cur = doc["current"];
   if (cur.isNull()) { Serial.println("[wx] no current block"); return false; }
@@ -107,6 +119,19 @@ bool fetchWeather() {
     s_dayCode[i] = dcode[k] | -1;
     s_dayMax[i]  = (int)lroundf(dmax[k] | -999.0f);
     s_dayMin[i]  = (int)lroundf(dmin[k] | -999.0f);
+  }
+
+  // 云端把空气质量合并在同一个响应里；直连时没有 air 字段，回退到单独请求
+  JsonObject air = doc["air"];
+  if (!air.isNull()) {
+    float a = air["us_aqi"] | -1.0f;
+    if (a >= 0) {
+      s_aqi  = (int)lroundf(a);
+      s_pm25 = (int)lroundf(air["pm2_5"] | -1.0f);
+      s_pm10 = (int)lroundf(air["pm10"] | -1.0f);
+    }
+  } else {
+    fetchAqi();
   }
   return true;
 }
@@ -165,7 +190,8 @@ void loop() {
   if ((int32_t)(millis() - s_next) < 0) return;
 
   bool okWx  = fetchWeather();
-  bool okAqi = fetchAqi();
+  bool okAqi = (s_aqi >= 0);          // 云端代理会在同一次响应里带上空气质量
+  if (!okAqi) okAqi = fetchAqi();
   bool ok    = okWx || okAqi;
 
   if (okWx) {
