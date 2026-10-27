@@ -36,6 +36,11 @@ mkdir -p "$ROOT/data"
 rm -f "$REL/server/data.db"
 ln -sfn "$ROOT/data/app.db" "$REL/server/data.db" 2>/dev/null || true
 
+if [ ! -f "$REL/web/index.html" ]; then
+  echo "!!  release 里没有 web/index.html，拒绝切换（检查 $REPO/web）"
+  exit 1
+fi
+
 ln -sfn "$REL" "$ROOT/current.new" && mv -Tf "$ROOT/current.new" "$ROOT/current"
 chown -R alarm:alarm "$ROOT" 2>/dev/null || true
 

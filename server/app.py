@@ -483,7 +483,11 @@ def sim_online(body: dict):
 
 
 # ---------------------------------------------------------------- static
-app.mount("/", StaticFiles(directory=str(ROOT / "web"), html=True), name="web")
+WEB = ROOT / "web"
+if not (WEB / "index.html").exists():
+    # fail fast: 一个缺静态资源的 release 不应该被切上线
+    raise RuntimeError(f"web assets missing: {WEB}/index.html")
+app.mount("/", StaticFiles(directory=str(WEB), html=True), name="web")
 
 init()
 if MQTT_URL:
