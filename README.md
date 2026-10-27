@@ -144,7 +144,7 @@ alarm-clock/
 │
 ├── firmware/                     # PlatformIO 工程 ✅
 │   ├── platformio.ini
-│   ├── boards/                   # 自定义 N16R8 板定义（待补）
+│   ├── boards/                   # 自定义 N16R8 板定义
 │   ├── include/
 │   │   ├── pins.h                # 引脚唯一出处
 │   │   ├── config.h              # 常量与默认值
@@ -160,27 +160,24 @@ alarm-clock/
 │   ├── lib/                      # 自写可复用库
 │   └── test/                     # 纯逻辑单测（闹钟引擎）
 │
-├── server/                       # 腾讯云后端（规划）
-│   ├── docker-compose.yml        # Nginx + FastAPI + MySQL + EMQX
-│   ├── requirements.txt
-│   ├── .env.example
-│   ├── app/
-│   │   ├── main.py
-│   │   ├── api/                  # alarms / devices / auth
-│   │   ├── models/               # SQLAlchemy
-│   │   ├── mqtt/                 # REST ↔ MQTT 桥接
-│   │   └── services/             # weather / scheduler
-│   └── tests/
+├── server/                       # 腾讯云后端 ✅
+│   ├── app.py                    # FastAPI：设备、闹钟、登录、天气代理
+│   ├── asr.py                    # 腾讯云语音识别客户端
+│   ├── intent.py                 # 规则式意图解析
+│   └── ...
 │
-├── web/                          # 手机 H5（规划）
+├── web/                          # 手机 H5 ✅
 │   ├── index.html
-│   ├── src/                      # main.js / api.js / ui.js
-│   └── styles.css
+│   ├── login.html
+│   ├── app.js
+│   └── style.css
 │
-└── hardware/                     # 实物资料（规划）
-    ├── bom.xlsx
-    ├── wiring.png
-    └── datasheets/
+└── deploy/                       # 服务器部署 ✅
+    ├── alarm.service             # systemd 单元（uvicorn 127.0.0.1:8001）
+    ├── deploy.sh                 # 发布 + 软链 + 健康检查 + 回滚
+    ├── install_mosquitto.sh      # broker、密码文件、监听
+    ├── install_ops.sh            # 备份定时器、日志轮转
+    └── nginx-alarm.conf          # 宝塔反代片段
 ```
 
 **分层依赖只允许单向**：`main → ui / net / core → bsp`。`bsp/` 不得引用上层任何头文件。
