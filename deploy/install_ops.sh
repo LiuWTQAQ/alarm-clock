@@ -12,10 +12,11 @@ if [ -f /etc/mosquitto/passwd ]; then
   chown root:mosquitto /etc/mosquitto/passwd
   chmod 640 /etc/mosquitto/passwd
   ls -l /etc/mosquitto/passwd
-  if ! grep -q '^user mosquitto' /etc/mosquitto/mosquitto.conf 2>/dev/null; then
-    echo "    !! mosquitto.conf 里没有 'user mosquitto'，正在补上"
+  if ! grep -rqs '^user ' /etc/mosquitto/mosquitto.conf /etc/mosquitto/conf.d/ 2>/dev/null; then
+    echo "    !! 配置里没有 'user'，补上 user mosquitto 并重启"
     printf '\n# root 启动后降权\nuser mosquitto\n' >> /etc/mosquitto/mosquitto.conf
     systemctl restart mosquitto
+    sleep 1
   fi
   systemctl is-active --quiet mosquitto && echo "    mosquitto 运行中"
 else
