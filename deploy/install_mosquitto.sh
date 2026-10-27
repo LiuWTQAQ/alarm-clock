@@ -19,28 +19,39 @@ command -v mosquitto >/dev/null 2>&1 || { echo "!! 安装后仍找不到 mosquit
 echo "==> 2/6 生成密码文件"
 MOSQ_UID=$(id -u mosquitto 2>/dev/null || echo 0)
 mosquitto_passwd -b -c /etc/mosquitto/passwd "$MQ_USER" "$MQ_PASS"
-chown "$MOSQ_UID:$MOSQ_UID" /etc/mosquitto/passwd 2>/dev/null || true
+chown root:root /etc/mosquitto/passwd
 chmod 600 /etc/mosquitto/passwd
 
-echo "==> 3/6 写入独立配置 /etc/mosquitto/alarm.conf"
-cat >/etc/mosquitto/alarm.conf <<EOF
-# 由 deploy/install_mosquitto.sh 生成，避免与发行版自带配置冲突
+echo "==> 3/6 定位发行版配置文件"
+# mosquitto 2.x 要求密码文件属主是 root（进程先以 root 读文件再降权）
+chown root:root /etc/mosquitto/passwd
+chmod 600 /etc/mosquitto/passwd
+
+UNIT_CONF=$(systemctl cat mosquitto 2>/dev/null \
+  | sed -n 's/.*-c \([^ ]*\).*/\1/p' | head -1)
+UNIT_CONF="${UNIT_CONF:-/etc/mosquitto/mosquitto.conf}"
+echo "    使用配置文件：$UNIT_CONF"
+if [ -f "$UNIT_CONF" ] && [ ! -f "$UNIT_CONF.orig" ]; then
+  cp -a "$UNIT_CONF" "$UNIT_CONF.orig"
+  echo "    已备份原配置到 $UNIT_CONF.orig"
+fi
+
+echo "==> 4/6 写入配置并重启"
+cat >"$UNIT_CONF" <<EOF
+# 由 deploy/install_mosquitto.sh 生成
 per_listener_settings false
 listener 1883 0.0.0.0
 allow_anonymous false
 password_file /etc/mosquitto/passwd
 max_keepalive 120
 persistence false
-log_dest journal
+log_dest stderr
+connection_messages true
 EOF
 
-echo "==> 4/6 让 systemd 使用这份配置"
-mkdir -p /etc/systemd/system/mosquitto.service.d
-cat >/etc/systemd/system/mosquitto.service.d/alarm.conf <<EOF
-[Service]
-ExecStart=
-ExecStart=/usr/sbin/mosquitto -c /etc/mosquitto/alarm.conf
-EOF
+# 清掉上一版脚本留下的 drop-in，避免重复/冲突
+rm -f /etc/systemd/system/mosquitto.service.d/alarm.conf
+rmdir /etc/systemd/system/mosquitto.service.d 2>/dev/null || true
 systemctl daemon-reload
 systemctl enable mosquitto >/dev/null 2>&1 || true
 systemctl restart mosquitto
