@@ -158,3 +158,25 @@
 | `ring` | str | 铃声名（`故事时间`/`清晨`/`鸟鸣`/`经典`/`渐强`） |
 
 设备端 P2 阶段只需实现 `mask` 与 `snooze`；`ring` 在音频阶段映射到不同 WAV。
+
+## 天气代理
+
+设备不再分别请求 open-meteo 的两个接口，而是走云端合并接口（公开、限流 60 次/分钟/IP、按坐标缓存 30 分钟）：
+
+```http
+GET /api/weather?lat=30.5728&lon=104.0668
+```
+
+返回体就是 open-meteo `forecast` 的结构，额外多一个 `air`（来自 air-quality 接口的 `current`）：
+
+```json
+{
+  "current": {"temperature_2m": 18.5, "apparent_temperature": 17.9,
+              "relative_humidity_2m": 62, "weather_code": 1},
+  "daily":   {"weather_code": [1,2,3,61], "temperature_2m_max": [...], "temperature_2m_min": [...]},
+  "air":     {"us_aqi": 105, "pm2_5": 31.2, "pm10": 50.6},
+  "cached":  false
+}
+```
+
+固件侧：优先请求该接口；失败（4xx/5xx/超时）则回退直连 `api.open-meteo.com`，保证服务器故障时天气仍可用。
