@@ -136,12 +136,10 @@ menu{display:flex;justify-content:flex-end;gap:10px;margin:18px 0 0;padding:0}
 .switch input:checked + span:before{transform:translateX(20px)}
 
 .picker{position:absolute;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;
-        background:rgba(0,0,0,.45);isolation:isolate;
-        -webkit-backdrop-filter:blur(20px) saturate(140%);backdrop-filter:blur(20px) saturate(140%)}
+        isolation:isolate}
 .picker[hidden]{display:none}
-.picker .panel{position:relative;z-index:1;max-width:520px;width:100%;background:#1c1c1e;
-               border:1px solid #ffffff14;border-bottom:0;border-radius:22px 22px 0 0;
-               padding:8px 0 20px;max-height:80vh;overflow:auto;box-shadow:0 -14px 44px #000c}
+.picker .panel{position:relative;z-index:1;max-width:520px;width:100%;
+               border-radius:22px 22px 0 0;padding:8px 0 20px;max-height:80vh;overflow:auto}
 .picker .row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;
      padding:0 14px;font-size:16px;color:var(--text);border-top:1px solid #ffffff0f;background:none;
      width:100%;text-align:left;box-sizing:border-box}
@@ -182,4 +180,207 @@ menu{display:flex;justify-content:flex-end;gap:10px;margin:18px 0 0;padding:0}
 #logout:hover{color:var(--text);border-color:#3a4152}
 @media (max-width:899px){
   #logout{right:10px;padding:5px 10px;font-size:12.5px}
+}
+
+/* ================================================================
+   Theme v2 — “深夜玻璃”视觉层（只覆盖外观，不动布局与交互）
+   ================================================================ */
+:root{
+  --bg:#06070b;
+  --card:rgba(255,255,255,.035);
+  --card2:rgba(255,255,255,.055);
+  --line:rgba(255,255,255,.075);
+  --text:#f2f4f8;
+  --dim:#8b93a4;
+  --acc:#2ee6f6;
+  --warm:#ffb454;
+  --ok:#34d399;
+  --radius:18px;
+  --glass:blur(22px) saturate(150%);
+}
+
+/* 背景：两团极淡的光 + 细颗粒，避免大面积死黑 */
+html{background:#06070b}
+body{
+  background:
+    radial-gradient(1100px 620px at 12% -8%, rgba(46,230,246,.15), transparent 68%),
+    radial-gradient(900px 520px at 92% -4%, rgba(124,92,255,.13), transparent 66%),
+    radial-gradient(900px 600px at 50% 112%, rgba(46,230,246,.06), transparent 72%),
+    #06070b;
+  background-attachment:fixed;
+}
+body::after{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.03;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+main,.tabs{position:relative;z-index:1}
+
+/* 顶栏 / 底栏：玻璃条 */
+.tabs{background:rgba(8,10,16,.72);backdrop-filter:var(--glass);
+      -webkit-backdrop-filter:var(--glass);border-color:rgba(255,255,255,.07)}
+.tab{font-size:13.5px;letter-spacing:.4px;transition:color .2s,opacity .2s;opacity:.75}
+.tab.active{opacity:1;color:var(--acc)}
+@media (min-width:900px){
+  .tabs{background:rgba(8,10,16,.6)}
+  .tab{padding:15px 26px}
+}
+
+/* 标题区 */
+h1{font-size:19px;font-weight:650;letter-spacing:.2px}
+.sub{letter-spacing:.2px}
+.clock{font-weight:300;letter-spacing:1px;
+       background:linear-gradient(180deg,#ffffff,#c9d3e3);-webkit-background-clip:text;
+       background-clip:text;color:transparent}
+
+/* 卡片：玻璃 + 顶部高光边 */
+.card{
+  position:relative;background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.028));
+  border:1px solid rgba(255,255,255,.075);border-radius:var(--radius);
+  box-shadow:0 1px 0 rgba(255,255,255,.06) inset, 0 18px 40px -28px rgba(0,0,0,.9);
+  backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);
+  transition:transform .22s cubic-bezier(.2,.8,.2,1), border-color .22s, box-shadow .22s;
+}
+@media (min-width:900px){
+  .card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.13);
+              box-shadow:0 1px 0 rgba(255,255,255,.08) inset, 0 26px 50px -30px rgba(0,0,0,.95)}
+}
+.card h2{font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:#7f8798;font-weight:600}
+
+/* 天气数字 */
+.env .temp b{font-size:40px;font-weight:300;letter-spacing:-.5px;
+             background:linear-gradient(180deg,#fff,#b9c6da);-webkit-background-clip:text;
+             background-clip:text;color:transparent}
+
+/* 主按钮：青→深青渐变 + 微光 */
+.primary{
+  background:linear-gradient(135deg,#3ae7f7,#0ea5b7 55%,#0b7f92);
+  color:#02161a;font-weight:700;letter-spacing:.3px;border-radius:14px;
+  box-shadow:0 1px 0 rgba(255,255,255,.45) inset, 0 10px 26px -12px rgba(46,230,246,.65);
+  transition:transform .15s, filter .2s, box-shadow .2s;
+}
+.primary:hover{filter:brightness(1.06)}
+.primary:active{transform:scale(.985)}
+
+/* 开关、圆钮、次要按钮 */
+.circ{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);
+      backdrop-filter:blur(8px);transition:background .2s, transform .15s}
+.circ:active{transform:scale(.94)}
+.circ.accent{background:linear-gradient(135deg,#ffd479,#f0a41a);border-color:transparent;
+             color:#241600;box-shadow:0 8px 20px -10px rgba(240,164,26,.8)}
+
+/* 弹层：更深的玻璃与更柔的边 */
+.sheet{background:rgba(3,4,8,.55);backdrop-filter:blur(14px) saturate(130%);
+       -webkit-backdrop-filter:blur(14px) saturate(130%)}
+.sheet .panel,.picker .panel{
+  background:linear-gradient(180deg,#15171f,#101219);
+  border:1px solid rgba(255,255,255,.09);border-bottom:0;
+  box-shadow:0 -1px 0 rgba(255,255,255,.08) inset, 0 -30px 80px -40px #000;
+}
+.picker{background:rgba(3,4,8,.5);
+        backdrop-filter:blur(26px) saturate(140%);-webkit-backdrop-filter:blur(26px) saturate(140%)}
+.picker .row,.sheet .row{border-top:1px solid rgba(255,255,255,.06)}
+.picker .row b,.sheet .row b{color:#7ee787}
+
+/* 日选择胶囊 */
+.day{border-radius:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);
+     transition:background .18s, transform .12s, border-color .18s}
+.day.on{background:linear-gradient(160deg,rgba(46,230,246,.95),rgba(14,165,183,.9));
+        border-color:transparent;color:#04181c;font-weight:600;
+        box-shadow:0 8px 22px -12px rgba(46,230,246,.9)}
+.day:active{transform:scale(.94)}
+
+/* 滚轮选中行 */
+.band{background:rgba(255,255,255,.06);border-radius:14px;
+      box-shadow:0 0 0 1px rgba(255,255,255,.06) inset}
+.witem.on{font-weight:600}
+
+/* 事件流 */
+.ev{font-variant-numeric:tabular-nums}
+.ev .t{color:#6f7787}
+
+/* 滚动条（桌面） */
+@media (min-width:900px){
+  ::-webkit-scrollbar{width:10px}
+  ::-webkit-scrollbar-thumb{background:#252a35;border-radius:10px;border:3px solid transparent;
+                            background-clip:content-box}
+}
+
+/* ---------------- 天气卡：渐变底 + 光晕水印 */
+.card.env{
+  position:relative;overflow:hidden;
+  background:linear-gradient(140deg,rgba(46,230,246,.14),rgba(124,92,255,.08) 46%,rgba(255,255,255,.02) 78%),
+             linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
+  border-color:rgba(255,255,255,.1);
+}
+.card.env::after{
+  content:"";position:absolute;right:-46px;top:-52px;width:190px;height:190px;border-radius:50%;
+  background:radial-gradient(circle at 40% 40%,rgba(46,230,246,.34),rgba(46,230,246,0) 68%);
+  pointer-events:none;
+}
+.card.env > *{position:relative;z-index:1}
+.card.env .temp b{font-size:46px;line-height:1.05}
+.card.env #cond{font-size:15px;color:#cfd8e6;margin-top:2px}
+
+/* AQI 胶囊 */
+.aqi{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:4px 10px;border-radius:999px;
+     background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);font-size:12.5px;color:#cfd8e6}
+.aqi b{font-weight:600;color:#fff}
+
+/* 页脚 */
+.site-foot{
+  max-width:1080px;margin:44px auto 0;padding:22px 24px 8px;
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+  color:#5f6675;font-size:12px;letter-spacing:.6px;
+  border-top:1px solid rgba(255,255,255,.06);
+}
+.site-foot .brand{display:flex;align-items:center;gap:8px;color:#8890a0}
+.site-foot .mark{width:16px;height:16px;border-radius:5px;
+  background:linear-gradient(135deg,#3ae7f7,#0b7f92);box-shadow:0 0 12px -2px rgba(46,230,246,.7)}
+@media (max-width:899px){
+  .site-foot{margin-top:28px;padding:18px 18px 4px;font-size:11.5px}
+}
+
+/* 让页脚沉底，避免桌面大片空 */
+body{display:flex;flex-direction:column;min-height:100vh}
+main{flex:1 0 auto;width:100%}
+.site-foot{flex:none}
+
+/* 天气卡光晕收敛一点 */
+.card.env::after{width:150px;height:150px;right:-38px;top:-44px;filter:blur(18px);
+  background:radial-gradient(circle at 40% 40%,rgba(46,230,246,.28),rgba(46,230,246,0) 66%)}
+.site-foot{width:100%}
+
+@media (max-width:899px){
+  .site-foot{flex-direction:column;align-items:flex-start;gap:6px;white-space:nowrap;
+             font-size:11px;letter-spacing:.3px}
+  .site-foot .brand{font-size:11.5px}
+}
+
+/* 三级面板：模糊别太重，保留一点上下文 */
+.picker{background:rgba(3,4,8,.42);
+        -webkit-backdrop-filter:blur(18px) saturate(130%);backdrop-filter:blur(18px) saturate(130%)}
+.picker .body{padding:0 12px}
+.picker .body > .row{border-radius:10px}
+.picker .body > .row + .row{margin-top:6px}
+.picker{background:rgba(0,0,0,.28);
+        -webkit-backdrop-filter:blur(14px) saturate(125%);backdrop-filter:blur(14px) saturate(125%)}
+
+/* 避免“双层压暗”变成一堵黑墙：二级只轻压，三级只模糊不再叠暗 */
+.sheet{background:rgba(3,4,8,.42)}
+.picker{background:transparent;
+        -webkit-backdrop-filter:blur(16px) saturate(120%);backdrop-filter:blur(16px) saturate(120%)}
+
+/* 桌面放大一档，避免在 1440 宽下显得“小气” */
+@media (min-width:1200px){
+  main{max-width:1180px;padding:26px 28px 40px}
+  .grid{grid-template-columns:440px 1fr;gap:22px}
+  .clock{font-size:56px}
+  .card{padding:20px 22px;margin:14px 0}
+  .card.env .temp b{font-size:56px}
+  .atime{font-size:34px}
+  .atime small{font-size:13px}
+  .arep{font-size:15px}
+  .arow{padding:12px 0}
+  .site-foot{max-width:1180px}
+  .tab{padding:17px 30px;font-size:14.5px}
 }
