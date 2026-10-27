@@ -22,6 +22,7 @@ copy_tree() {
   fi
 }
 copy_tree
+touch "$REL"   # rsync -a 会把源目录的 mtime 复制过来，这里改回当前时间
 
 if [ ! -x "$ROOT/venv/bin/uvicorn" ]; then
   echo "==> 首次创建虚拟环境"
@@ -57,11 +58,17 @@ done
 
 if [ "$ok" = "1" ] && systemctl is-active --quiet alarm; then
   echo "==> OK  https://alarm.yoshino-liuwt.top"
-  ls -1dt "$ROOT"/releases/* | tail -n +4 | xargs -r rm -rf   # 只保留最近 3 个版本
+  # 按目录名（YYYYmmdd-HHMMSS）排序，不要用 mtime 排序：
+  # rsync -a 会把源目录的 mtime 复制到 release 根目录，用 mtime 会把刚发布的版本当旧版本删掉
+  CUR=$(readlink -f "$ROOT/current")
+  for d in $(ls -1d "$ROOT"/releases/* | sort -r | tail -n +4); do
+    [ "$d" = "$CUR" ] && continue
+    rm -rf "$d"
+  done
 else
   echo "!!  健康检查失败（http=$code, unit=$(systemctl is-active alarm 2>/dev/null)），回滚"
   echo "!!  健康检查失败，回滚到上一个版本"
-  PREV=$(ls -1dt "$ROOT"/releases/* | sed -n 2p)
+  PREV=$(ls -1d "$ROOT"/releases/* | sort -r | sed -n 2p)
   [ -n "$PREV" ] && ln -sfn "$PREV" "$ROOT/current"
   systemctl restart alarm
   exit 1
