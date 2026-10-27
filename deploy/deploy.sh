@@ -40,11 +40,19 @@ chown -R alarm:alarm "$ROOT" 2>/dev/null || true
 echo "==> 重启服务"
 systemctl restart alarm
 
-sleep 2
-if curl -fsS http://127.0.0.1:8001/api/devices >/dev/null; then
+# /api/health 是公开接口；/api/devices 需要登录，会返回 401，不能用来判活。
+ok=0
+for _ in $(seq 1 24); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8001/api/health || true)
+  [ "$code" = "200" ] && { ok=1; break; }
+  sleep 0.5
+done
+
+if [ "$ok" = "1" ] && systemctl is-active --quiet alarm; then
   echo "==> OK  https://alarm.yoshino-liuwt.top"
   ls -1dt "$ROOT"/releases/* | tail -n +4 | xargs -r rm -rf   # 只保留最近 3 个版本
 else
+  echo "!!  健康检查失败（http=$code, unit=$(systemctl is-active alarm 2>/dev/null)），回滚"
   echo "!!  健康检查失败，回滚到上一个版本"
   PREV=$(ls -1dt "$ROOT"/releases/* | sed -n 2p)
   [ -n "$PREV" ] && ln -sfn "$PREV" "$ROOT/current"
