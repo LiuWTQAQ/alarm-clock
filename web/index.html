@@ -119,6 +119,20 @@
           </label>
         </section>
 
+        <section class="card form">
+          <h2 data-i18n="sec_net">网络</h2>
+          <p class="muted small" id="curSsid">—</p>
+          <label><span data-i18n="ssid">Wi-Fi 名称（SSID）</span>
+            <input id="sSsid" maxlength="32" autocomplete="off" placeholder="留空则不修改">
+          </label>
+          <label><span data-i18n="wpass">Wi-Fi 密码</span>
+            <input id="sWpass" type="password" maxlength="64" autocomplete="new-password" placeholder="留空则保持原密码">
+          </label>
+          <button id="wifiBtn" class="primary" data-i18n="wifi_save">保存到设备</button>
+          <p class="muted small" id="wifiMsg"></p>
+          <p class="muted small" data-i18n="wifi_hint">下发后设备会断开并重连，约 5–10 秒。填错时可在设备本地页面（屏幕上的 IP）改回。</p>
+        </section>
+
         <section class="card">
           <button id="saveSettings" class="primary" data-i18n="save">保存并下发</button>
           <p class="muted small" id="saveHint"></p>

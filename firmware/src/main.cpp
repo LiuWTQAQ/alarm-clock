@@ -69,14 +69,9 @@ void loop() {
   ui::loop();
 
   // Wi-Fi state -> header + bottom line
-  static bool lastUp = false;
-  static int  lastRssi = 0;
   bool up = net_time::connected();
   int  rssi = net_time::rssi();
-  if (up != lastUp || rssi != lastRssi) {
-    lastUp = up; lastRssi = rssi;
-    ui::setWifi(up, rssi);
-  }
+  ui::setWifi(up, rssi, net_time::ssid());
 
   // clock, once per second
   static int lastSec = -1;

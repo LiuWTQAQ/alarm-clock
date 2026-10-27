@@ -7,7 +7,7 @@ void loop();                       // kept for main.cpp compatibility (no-op)
 
 void renderAll();                  // full repaint of the current page
 void tick(const struct tm& t);     // once per second: clock + date + progress bar
-void setWifi(bool up, int rssi);
+void setWifi(bool up, int rssi, const char* ssid = nullptr);
 void setWeather(int tempC, const char* cond);
 void setAqi(int aqi, const char* label);
 void setCity(const char* name);

@@ -6,6 +6,7 @@
 #include <LittleFS.h>
 #include "settings.h"
 #include "weather.h"
+#include "net_time.h"
 #include "../ui/ui.h"
 
 namespace webcfg {
@@ -28,6 +29,15 @@ button{margin-top:14px;width:100%;padding:12px;border:0;border-radius:10px;backg
 img{width:100%;border-radius:10px;margin-top:12px;background:#000}
 .note{font-size:12px;color:#7d8797;margin-top:10px;line-height:1.6}
 </style></head><body><h1>智能闹钟 · 设置</h1>
+<form class="card" method="POST" action="/wifi"><label>Wi-Fi 名称（SSID）</label>
+<input name="ssid" maxlength="32" value=")HTML";
+
+const char* MIDW = R"HTML(">
+<label style="display:block;margin-top:12px">Wi-Fi 密码</label>
+<input name="pass" type="password" maxlength="64" placeholder="留空则保持原密码">
+<button>保存并重连</button>
+<div class="note">保存后设备会断开当前网络并连接新网络，约 5–10 秒；<br>如果连不上，用串口监视器可以看到重试日志。</div>
+</form>
 <form class="card" method="POST" action="/save"><label>天气城市</label><select name="city">)HTML";
 
 const char* MID = R"HTML(</select><button>保存城市</button>
@@ -45,6 +55,8 @@ String page() {
   String p;
   p.reserve(4096);
   p += HEAD;
+  p += net_time::ssid();
+  p += MIDW;
   for (int i = 0; i < settings::cityCount(); i++) {
     p += "<option value=\"";
     p += i;
@@ -71,6 +83,25 @@ void handleSave() {
                 settings::cityName(), settings::lat(), settings::lon());
   server.sendHeader("Location", "/", true);
   server.send(302, "text/plain", "");
+}
+
+void handleWifi() {
+  String ssid = server.arg("ssid");
+  String pass = server.arg("pass");
+  ssid.trim();
+  if (!ssid.length()) {
+    server.send(400, "text/html; charset=utf-8",
+                "<meta charset=utf-8><p>SSID 不能为空</p><p><a href=\"/\">返回</a></p>");
+    return;
+  }
+  if (!pass.length()) pass = String(net_time::pass());
+  net_time::setCredentials(ssid.c_str(), pass.c_str());
+  server.send(200, "text/html; charset=utf-8",
+              "<meta charset=utf-8><meta name=viewport content='width=device-width'>"
+              "<body style='font-family:sans-serif;background:#0e1116;color:#e6e9ef;padding:24px'>"
+              "<h3>已保存</h3><p>正在连接 <b>" + ssid + "</b>，约 5–10 秒。</p>"
+              "<p>屏幕顶部会显示新网络名；若 30 秒后仍显示旧名或离线，请重新连接旧网络后改回。</p>"
+              "</body>");
 }
 
 void handleUpload() {
@@ -101,6 +132,7 @@ void begin() {
   LittleFS.begin(true);
   server.on("/", handleRoot);
   server.on("/save", HTTP_POST, handleSave);
+  server.on("/wifi", HTTP_POST, handleWifi);
   server.on("/upload", HTTP_POST,
             []() { server.sendHeader("Location", "/", true); server.send(302, "text/plain", ""); },
             handleUpload);

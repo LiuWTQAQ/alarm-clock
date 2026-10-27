@@ -6,7 +6,11 @@ const $$ = s => [...document.querySelectorAll(s)];
 const I18N = {
   zh: {
     title:'闹钟 · 远程控制', tab_home:'主页', tab_settings:'设置', logout:'退出',
-    connecting:'连接中…', online:(r)=>`在线 · 信号 ${r} dBm`, offline:'离线（使用本地闹钟）',
+    connecting:'连接中…',
+    sec_net:'网络', ssid:'Wi-Fi 名称（SSID）', wpass:'Wi-Fi 密码',
+    wifi_save:'保存到设备', need_ssid:'请先填写 SSID',
+    sent:'已下发，设备正在重连…',
+    wifi_hint:'下发后设备会断开并重连，约 5–10 秒。填错时可在设备本地页面（屏幕上的 IP）改回。', online:(w)=>w ? `在线 · ${w}` : '在线', offline:'离线（使用本地闹钟）',
     down:'服务未启动', air:(n)=>`空气 ${n}`,
     lamp:'灯', lamp_hint:'继电器 · 卧室顶灯', ac:'空调', ac_hint:'红外 · 房间空调',
     on:'开', off:'关', alarms:'闹钟', add:'+ 新增', events:'事件',
@@ -30,7 +34,11 @@ const I18N = {
   },
   en: {
     title:'Alarm Clock · Remote', tab_home:'Home', tab_settings:'Settings', logout:'Sign out',
-    connecting:'Connecting…', online:(r)=>`Online · ${r} dBm`, offline:'Offline (local alarms)',
+    connecting:'Connecting…',
+    sec_net:'Network', ssid:'Wi-Fi SSID', wpass:'Wi-Fi password',
+    wifi_save:'Push to device', need_ssid:'SSID is required',
+    sent:'Pushed, the device is reconnecting…',
+    wifi_hint:'The device drops and reconnects, about 5–10 s. If it fails, fix it on the device\'s local page (the IP shown on screen).', online:(w)=>w ? `Online · ${w}` : 'Online', offline:'Offline (local alarms)',
     down:'Service unavailable', air:(n)=>`AQI ${n}`,
     lamp:'Light', lamp_hint:'Relay · bedroom ceiling light', ac:'AC', ac_hint:'IR · room air conditioner',
     on:'On', off:'Off', alarms:'Alarms', add:'+ Add', events:'Events',
@@ -206,7 +214,9 @@ setInterval(paintClock, 1000);
 function paintState(s) {
   state = s;
   $('#dot').className = 'dot' + (s.online ? ' on' : '');
-  $('#conn').textContent = s.online ? tf('online', s.net?.rssi ?? '--') : t('offline');
+  $('#conn').textContent = s.online ? tf('online', s.net?.ssid || '') : t('offline');
+  const cs = $('#curSsid');
+  if (cs) cs.textContent = (lang === 'en' ? 'Current: ' : '当前：') + (s.net?.ssid || '—');
   const f = !!settings.fahrenheit;
   const v = s.env?.t;
   $('#temp').textContent = v == null ? '--' : (f ? Math.round(v * 9 / 5 + 32) : v);
@@ -475,6 +485,19 @@ const bump = async d => {
 };
 $('#tmin').onclick = () => bump(-1);
 $('#tplus').onclick = () => bump(+1);
+
+$('#wifiBtn')?.addEventListener('click', async () => {
+  const ssid = $('#sSsid').value.trim(), pass = $('#sWpass').value;
+  const msg = $('#wifiMsg');
+  if (!ssid) { msg.textContent = t('need_ssid'); return; }
+  msg.textContent = '…';
+  try {
+    await api(`/api/devices/${DEV}/cmd`, {method: 'POST',
+      body: JSON.stringify({op: 'wifi.set', ssid, pass})});
+    msg.textContent = t('sent');
+    $('#sSsid').value = ''; $('#sWpass').value = '';
+  } catch (e) { msg.textContent = String(e); }
+});
 
 $('#logout')?.addEventListener('click', async () => {
   try { await fetch('/api/logout', {method: 'POST'}); } catch {}

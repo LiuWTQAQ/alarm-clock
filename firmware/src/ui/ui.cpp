@@ -113,6 +113,7 @@ char     s_date[32] = "---";
 char     s_city[16] = "北京";
 bool     s_wifi = false;
 int      s_rssi = 0;
+char     s_ssid[33] = "";
 int      s_aqi = -1;
 const char* s_aqiText = "";
 bool     s_acOn = false;
@@ -420,6 +421,20 @@ void drawTopLine() {
 void drawHeader() {
   tft.fillRect(0, 0, 320, 22, C_BG);
   textS(cn18, s_date, 10, 1, C_DIM);
+
+  // SSID, right-aligned just left of the signal bars
+  if (s_ssid[0]) {
+    const int kMax = 104, kRight = 222;
+    char cut[34];
+    snprintf(cut, sizeof(cut), "%s", s_ssid);
+    int w = cnWidth(cn15, cut);
+    while (w > kMax && strlen(cut) > 1) {
+      cut[strlen(cut) - 1] = 0;
+      w = cnWidth(cn15, cut);
+    }
+    strncat(cut, w > kMax ? "…" : "", sizeof(cut) - strlen(cut) - 1);
+    textS(cn15, cut, kRight - cnWidth(cn15, cut), 3, s_wifi ? C_TEXT : C_DIM);
+  }
 
   int x = 226;
   for (int i = 0; i < 4; i++) {
@@ -943,9 +958,11 @@ void tick(const struct tm& t) {
   drawBar();
 }
 
-void setWifi(bool up, int rssi) {
-  if (up == s_wifi && rssi == s_rssi && s_bars >= 0) return;
+void setWifi(bool up, int rssi, const char* ssid) {
+  const char* want = ssid ? ssid : "";
+  if (up == s_wifi && rssi == s_rssi && s_bars >= 0 && !strcmp(want, s_ssid)) return;
   s_wifi = up; s_rssi = rssi;
+  snprintf(s_ssid, sizeof(s_ssid), "%s", want);
   s_bars = 1;
   if (s_page == P_HOME) drawHeader();
 }

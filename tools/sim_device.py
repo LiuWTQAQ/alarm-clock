@@ -48,6 +48,7 @@ class Device:
         self.light = {"on": False}
         self.ac = {"on": False, "temp": 26}
         self.rev = 0
+        self.ssid = "LiuWT-5G"
         self.state = {}
 
     def push(self):
@@ -58,7 +59,7 @@ class Device:
             "alarms": self.alarms,
             "light": self.light, "ac": self.ac,
             "env": {"t": 16, "h": 67, "aqi": 98, "cond": "阴"},
-            "net": {"rssi": -62, "ip": "192.168.31.173"},
+            "net": {"rssi": -62, "ip": "192.168.31.173", "ssid": self.ssid},
         }
         payload["clock"] = "%02d:%02d:%02d" % (now.tm_hour, now.tm_min, now.tm_sec)
         self.state = payload
@@ -80,6 +81,14 @@ class Device:
             elif cmd.get("key") == "temp":
                 self.ac["temp"] = max(16, min(30, self.ac["temp"] + 1))
             print(f"  <- ac.send {cmd.get('key')} -> {self.ac}")
+        elif op == "wifi.set":
+            new = cmd.get("ssid") or ""
+            if not new:
+                ok, err = False, "no_ssid"
+            else:
+                self.ssid = new
+                self.rev += 1
+                print(f"  <- wifi.set ssid={new}")
         elif op == "time.sync":
             pass
         else:

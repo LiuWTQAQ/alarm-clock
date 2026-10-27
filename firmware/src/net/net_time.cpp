@@ -1,6 +1,7 @@
 #include "net_time.h"
 #include <Arduino.h>
 #include <WiFi.h>
+#include <Preferences.h>
 #include <time.h>
 #include "secrets.h"
 
@@ -10,6 +11,9 @@ enum State { S_WIFI, S_TIME, S_OK };
 State    s_state    = S_WIFI;
 uint32_t s_lastTry  = 0;
 uint32_t s_lastSync = 0;
+
+char     s_ssid[33] = WIFI_SSID;
+char     s_pass[65] = WIFI_PASS;
 
 const char* kNtp[3] = {"ntp.aliyun.com", "ntp.tencent.com", "cn.pool.ntp.org"};
 const char* kTz     = "CST-8";                 // Asia/Shanghai, no DST
@@ -24,16 +28,59 @@ bool haveSaneTime() {
   return t.tm_year > 120;                      // > 2020
 }
 
+void loadCreds() {
+  Preferences p;
+  if (!p.begin("wifi", true)) return;
+  String ssid = p.getString("ssid", "");
+  String pass = p.getString("pass", "");
+  p.end();
+  if (ssid.length() && ssid.length() < sizeof(s_ssid)) {
+    strncpy(s_ssid, ssid.c_str(), sizeof(s_ssid) - 1);
+    s_ssid[sizeof(s_ssid) - 1] = 0;
+    strncpy(s_pass, pass.c_str(), sizeof(s_pass) - 1);
+    s_pass[sizeof(s_pass) - 1] = 0;
+  }
+}
+
 }  // namespace
 
 void net_time::begin() {
+  loadCreds();
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
   WiFi.setSleep(false);                        // keeps SPI/TFT timing stable
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  WiFi.begin(s_ssid, s_pass);
   s_lastTry = millis();
-  Serial.printf("[net] connecting to %s\n", WIFI_SSID);
+  Serial.printf("[net] connecting to %s\n", s_ssid);
+}
+
+const char* net_time::ssid() {
+  return (WiFi.status() == WL_CONNECTED) ? WiFi.SSID().c_str() : s_ssid;
+}
+
+const char* net_time::pass() { return s_pass; }
+
+bool net_time::setCredentials(const char* ssid, const char* pass) {
+  if (!ssid || !*ssid) return false;
+  Preferences p;
+  if (p.begin("wifi", false)) {
+    p.putString("ssid", ssid);
+    p.putString("pass", pass ? pass : "");
+    p.end();
+  }
+  strncpy(s_ssid, ssid, sizeof(s_ssid) - 1);
+  s_ssid[sizeof(s_ssid) - 1] = 0;
+  strncpy(s_pass, pass ? pass : "", sizeof(s_pass) - 1);
+  s_pass[sizeof(s_pass) - 1] = 0;
+
+  WiFi.disconnect(true, false);
+  delay(200);
+  WiFi.begin(s_ssid, s_pass);
+  s_state = S_WIFI;
+  s_lastTry = millis();
+  Serial.printf("[net] credentials -> %s, reconnecting\n", s_ssid);
+  return true;
 }
 
 void net_time::loop() {
@@ -51,7 +98,7 @@ void net_time::loop() {
         s_lastTry = now;
         Serial.println("[net] retry wifi");
         WiFi.disconnect();
-        WiFi.begin(WIFI_SSID, WIFI_PASS);
+        WiFi.begin(s_ssid, s_pass);
       }
       break;
 
