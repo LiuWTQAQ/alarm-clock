@@ -11,7 +11,7 @@ const I18N = {
     lamp:'灯', lamp_hint:'继电器 · 卧室顶灯', ac:'空调', ac_hint:'红外 · 房间空调',
     on:'开', off:'关', alarms:'闹钟', add:'+ 新增', events:'事件',
     no_alarms:'还没有闹钟', no_events:'暂无事件',
-    r_once:'一次', r_work:'工作日', r_weekend:'周末', r_daily:'每天', r_custom:'自定义',
+    never:'永不', weekdays:'工作日', daily:'每天', weekend:'周末', custom:'自定义',
     edit:'改', del:'删', settings:'设置', settings_sub:'偏好保存在云端，并下发到设备',
     sec_loc:'位置与时间', city:'城市（决定天气）', tz:'时区', hourfmt:'时间格式',
     h24:'24 小时制', h12:'12 小时制', lang:'语言',
@@ -21,8 +21,12 @@ const I18N = {
     saved_push:(x)=>`已保存，下发到设备：${x}`, saved_same:'已保存（与设备一致，无需下发）',
     save_fail:(e)=>`保存失败：${e}`,
     dlg_new:'新增闹钟', dlg_edit:'编辑闹钟', time:'时间', repeat:'重复', label:'标签',
-    cancel:'取消', save_short:'保存',
-    placeholder_label:'起床',
+    ring:'铃声', snooze:'稍后提醒', snooze_len:'稍后提醒时长', delete_alarm:'删除闹钟',
+    repeat_hint:'根据节假日安排设定闹钟，可设定为特定日期重复，也可以自定义闹钟。',
+    minutes:(n)=>`${n} 分钟`, days:['一','二','三','四','五','六','日'],
+    days_long:['周一','周二','周三','周四','周五','周六','周日'],
+    day_range:(a,b)=>`${a}至${b}`,
+    rings:{'故事时间':'故事时间','清晨':'清晨','鸟鸣':'鸟鸣','经典':'经典','渐强':'渐强'},
   },
   en: {
     title:'Alarm Clock · Remote', tab_home:'Home', tab_settings:'Settings',
@@ -31,7 +35,7 @@ const I18N = {
     lamp:'Light', lamp_hint:'Relay · bedroom ceiling light', ac:'AC', ac_hint:'IR · room air conditioner',
     on:'On', off:'Off', alarms:'Alarms', add:'+ Add', events:'Events',
     no_alarms:'No alarms yet', no_events:'No events yet',
-    r_once:'Once', r_work:'Weekdays', r_weekend:'Weekend', r_daily:'Daily', r_custom:'Custom',
+    never:'Never', weekdays:'Weekdays', daily:'Every day', weekend:'Weekends', custom:'Custom',
     edit:'Edit', del:'Del', settings:'Settings', settings_sub:'Saved in the cloud and pushed to the device',
     sec_loc:'Location & time', city:'City (drives weather)', tz:'Time zone', hourfmt:'Time format',
     h24:'24-hour', h12:'12-hour', lang:'Language',
@@ -41,8 +45,12 @@ const I18N = {
     saved_push:(x)=>`Saved, pushed: ${x}`, saved_same:'Saved (already in sync)',
     save_fail:(e)=>`Save failed: ${e}`,
     dlg_new:'New alarm', dlg_edit:'Edit alarm', time:'Time', repeat:'Repeat', label:'Label',
-    cancel:'Cancel', save_short:'Save',
-    placeholder_label:'Wake up',
+    ring:'Sound', snooze:'Snooze', snooze_len:'Snooze duration', delete_alarm:'Delete alarm',
+    repeat_hint:'Set alarms around public holidays, specific dates, or your own schedule.',
+    minutes:(n)=>`${n} min`, days:['M','T','W','T','F','S','S'],
+    days_long:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+    day_range:(a,b)=>`${a}–${b}`,
+    rings:{'故事时间':'Storytime','清晨':'Morning','鸟鸣':'Birdsong','经典':'Classic','渐强':'Crescendo'},
   },
 };
 
@@ -97,11 +105,6 @@ const TZ_LABEL = {
 };
 const TZS = Object.keys(TZ_LABEL.zh);
 
-let state = {}, settings = {}, editing = null, view = 'home';
-let lang = localStorage.getItem('lang') || 'zh';
-const t = k => I18N[lang][k];
-const tf = (k, ...a) => { const v = I18N[lang][k]; return typeof v === 'function' ? v(...a) : v; };
-
 const COND_EN = {
   '晴':'Clear','多云':'Partly cloudy','阴':'Overcast','小雨':'Light rain','中雨':'Rain',
   '大雨':'Heavy rain','暴雨':'Storm','雷阵雨':'Thunderstorm','雷雨':'Thunderstorm',
@@ -111,7 +114,29 @@ const COND_EN = {
 };
 const condText = s => lang === 'en' ? (COND_EN[s] || s || '—') : (s || '—');
 
-const repText = m => ({0:'r_once',31:'r_work',96:'r_weekend',127:'r_daily'}[m] || 'r_custom');
+const PRESETS = [[0,'never'],[31,'weekdays'],[127,'daily'],[96,'weekend']];
+const RINGS = ['故事时间','清晨','鸟鸣','经典','渐强'];
+const SNOOZE_MIN = [5,9,10,15,20];
+const ITEM = 44;
+
+let state = {}, settings = {}, editing = null, view = 'home';
+let lang = localStorage.getItem('lang') || 'zh';
+const t = k => I18N[lang][k];
+const tf = (k, ...a) => { const v = I18N[lang][k]; return typeof v === 'function' ? v(...a) : v; };
+const ringText = r => (I18N[lang].rings[r] || r);
+
+function maskText(m) {
+  const p = PRESETS.find(([v]) => v === m);
+  if (p) return t(p[1]);
+  if (!m) return t('never');
+  const D = I18N[lang].days_long;
+  const on = [...Array(7).keys()].filter(i => m & (1 << i));
+  if (on.length >= 3) {
+    const run = on.every((d, k) => k === 0 || d === on[k - 1] + 1);
+    if (run) return I18N[lang].day_range(D[on[0]], D[on[on.length - 1]]);
+  }
+  return on.map(d => D[d]).join(lang === 'en' ? ', ' : '、');
+}
 
 async function api(path, opts = {}) {
   const r = await fetch(path, {headers: {'Content-Type': 'application/json'}, ...opts});
@@ -125,19 +150,22 @@ function applyLang() {
   document.title = t('title');
   $$('[data-i18n]').forEach(el => {
     const k = el.dataset.i18n;
-    if (I18N[lang][k] !== undefined && typeof I18N[lang][k] === 'string') el.textContent = t(k);
+    if (typeof I18N[lang][k] === 'string') el.textContent = t(k);
   });
-  $('#fLabel').placeholder = t('placeholder_label');
   buildSelects();
   paintClock();
   if (state.online !== undefined) paintState(state);
+  if (editing) { $('#shTitle').textContent = editing.id ? t('dlg_edit') : t('dlg_new');
+                 $('#vRepeat').textContent = maskText(editing.mask);
+                 $('#vRing').textContent = ringText(editing.ring);
+                 $('#vSnoozeMin').textContent = tf('minutes', editing.snooze_min); }
 }
 
 function buildSelects() {
   const city = $('#sCity').value || settings.city || '成都';
   const tzv = $('#sTz').value || settings.tz || 'Asia/Shanghai';
   $('#sCity').innerHTML = CITIES
-    .map(([zh, tz, en]) => `<option value="${zh}">${lang === 'en' ? en : zh}</option>`).join('');
+    .map(([zh, , en]) => `<option value="${zh}">${lang === 'en' ? en : zh}</option>`).join('');
   $('#sTz').innerHTML = TZS
     .map(z => `<option value="${z}">${(TZ_LABEL[lang][z] || z)}</option>`).join('');
   $('#sCity').value = city;
@@ -191,28 +219,23 @@ function paintAlarms(rows) {
   if (!rows.length) { ul.innerHTML = `<li class="muted">${t('no_alarms')}</li>`; return; }
   for (const a of rows) {
     const li = document.createElement('li');
+    li.className = 'arow';
     const hh = settings.hour12 ? (a.h % 12 || 12) : String(a.h).padStart(2, '0');
-    li.innerHTML = `<span class="time">${hh}:${String(a.m).padStart(2, '0')}${
-      settings.hour12 ? `<small class="muted"> ${a.h < 12 ? 'AM' : 'PM'}</small>` : ''}</span>
-      <span class="rep">${a.label || ''} ${t(repText(a.mask))}</span>`;
-    const tg = document.createElement('button');
-    tg.className = 'toggle ' + (a.on ? 'on' : 'off');
-    tg.textContent = a.on ? t('on') : t('off');
-    tg.onclick = async () => {
+    const main = document.createElement('button');
+    main.className = 'amain';
+    main.innerHTML = `<span class="atime">${hh}:${String(a.m).padStart(2, '0')}${
+      settings.hour12 ? `<small>${a.h < 12 ? 'AM' : 'PM'}</small>` : ''}</span>
+      <span class="arep">${a.label || ''}<em>${maskText(a.mask)}</em></span>`;
+    main.onclick = () => openSheet(a);
+    const sw = document.createElement('label');
+    sw.className = 'switch';
+    sw.innerHTML = `<input type="checkbox" ${a.on ? 'checked' : ''}><span></span>`;
+    sw.querySelector('input').onchange = async e => {
       await api(`/api/devices/${DEV}/alarms/${a.id}`, {method: 'PUT', body: JSON.stringify(
-        {h: a.h, m: a.m, mask: a.mask, on: !a.on, label: a.label})});
+        {...a, on: e.target.checked})});
       refresh();
     };
-    const ed = document.createElement('button');
-    ed.className = 'ghost'; ed.textContent = t('edit');
-    ed.onclick = () => openDialog(a);
-    const dl = document.createElement('button');
-    dl.className = 'ghost'; dl.textContent = t('del');
-    dl.onclick = async () => {
-      await api(`/api/devices/${DEV}/alarms/${a.id}`, {method: 'DELETE'});
-      refresh();
-    };
-    li.append(tg, ed, dl);
+    li.append(main, sw);
     ul.append(li);
   }
 }
@@ -235,9 +258,7 @@ async function refresh() {
 async function loadSettings() {
   try { settings = await api(`/api/devices/${DEV}/settings`); } catch { settings = {}; }
   if (settings.lang === 'zh' || settings.lang === 'en') {
-    lang = settings.lang;
-    localStorage.setItem('lang', lang);
-    applyLang();
+    lang = settings.lang; localStorage.setItem('lang', lang); applyLang();
   }
   buildSelects();
   $('#sCity').value = settings.city ?? '成都';
@@ -255,22 +276,15 @@ $('#sCity').addEventListener('change', () => {
 });
 
 $('#sLang').addEventListener('change', () => {
-  lang = $('#sLang').value;
-  localStorage.setItem('lang', lang);
-  applyLang();
-  paintAlarms(state.alarms || []);
-  refresh();
+  lang = $('#sLang').value; localStorage.setItem('lang', lang); applyLang(); refresh();
 });
 
 $('#saveSettings').onclick = async () => {
   const body = {
-    city: $('#sCity').value,
-    tz: $('#sTz').value,
-    hour12: $('#sHour').value === '12',
-    fahrenheit: $('#sUnit').value === 'f',
+    city: $('#sCity').value, tz: $('#sTz').value,
+    hour12: $('#sHour').value === '12', fahrenheit: $('#sUnit').value === 'f',
     wx_interval: Number($('#sWx').value),
-    name: $('#sName').value.trim() || '卧室闹钟',
-    lang,
+    name: $('#sName').value.trim() || '卧室闹钟', lang,
   };
   $('#saveHint').textContent = t('saving');
   try {
@@ -279,42 +293,162 @@ $('#saveSettings').onclick = async () => {
     $('#devName').textContent = r.settings.name;
     const pushed = Object.keys(r.pushed || {});
     $('#saveHint').textContent = pushed.length
-      ? tf('saved_push', pushed.join(lang === 'en' ? ', ' : '、'))
-      : t('saved_same');
-    paintClock();
-    paintAlarms(await api(`/api/devices/${DEV}/alarms`));
-  } catch (e) {
-    $('#saveHint').textContent = tf('save_fail', e.message);
-  }
+      ? tf('saved_push', pushed.join(lang === 'en' ? ', ' : '、')) : t('saved_same');
+    paintClock(); refresh();
+  } catch (e) { $('#saveHint').textContent = tf('save_fail', e.message); }
 };
 
-/* ---------------------------------------------------------------- dialog */
-function openDialog(a) {
-  editing = a || null;
-  $('#dlgTitle').textContent = a ? t('dlg_edit') : t('dlg_new');
-  $('#fTime').value = a ? `${String(a.h).padStart(2, '0')}:${String(a.m).padStart(2, '0')}` : '07:30';
-  $('#fMask').value = String(a ? a.mask : 31);
-  $('#fLabel').value = a?.label || '';
-  $('#fLabel').placeholder = t('placeholder_label');
-  $('#dlg').showModal();
+/* ---------------------------------------------------------------- wheel */
+function buildWheel(el, count, init) {
+  el.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const d = document.createElement('div');
+    d.className = 'witem';
+    d.textContent = String(i).padStart(2, '0');
+    el.append(d);
+  }
+  el.scrollTop = init * ITEM;
+  if (!el._bound) {
+    el._bound = true;
+    el.addEventListener('scroll', () => {
+      clearTimeout(el._t);
+      el._t = setTimeout(() => settleWheel(el), 110);
+    });
+  }
+  requestAnimationFrame(() => settleWheel(el));
 }
 
-$('#dlgCancel').onclick = () => { editing = null; $('#dlg').close(); };
+function settleWheel(el) {
+  const max = el.children.length - 1;
+  let idx = Math.round(el.scrollTop / ITEM);
+  idx = Math.max(0, Math.min(max, idx));
+  el.scrollTop = idx * ITEM;
+  el._idx = idx;
+  [...el.children].forEach((c, i) => {
+    const d = Math.abs(i - idx);
+    c.classList.toggle('on', d === 0);
+    c.style.opacity = d === 0 ? 1 : d === 1 ? 0.55 : 0.25;
+  });
+}
+const wheelValue = el => Math.max(0, Math.min(el.children.length - 1, Math.round(el.scrollTop / ITEM)));
 
-$('#form').addEventListener('submit', async e => {
-  e.preventDefault();
-  const [h, m] = $('#fTime').value.split(':').map(Number);
-  const body = {h, m, mask: Number($('#fMask').value), on: true,
-                label: $('#fLabel').value.slice(0, 9)};
-  if (editing) await api(`/api/devices/${DEV}/alarms/${editing.id}`, {method: 'PUT', body: JSON.stringify(body)});
-  else await api(`/api/devices/${DEV}/alarms`, {method: 'POST', body: JSON.stringify(body)});
+/* ---------------------------------------------------------------- sheet */
+function openSheet(a) {
+  editing = a ? {...a} : {h:7, m:30, mask:31, label:'', ring:'故事时间', snooze:true, snooze_min:9, on:true};
+  $('#shTitle').textContent = a ? t('dlg_edit') : t('dlg_new');
+  $('#vLabel').value = editing.label || '';
+  $('#vLabel').placeholder = lang === 'en' ? 'Alarm' : '闹钟';
+  $('#vRing').textContent = ringText(editing.ring);
+  $('#vSnooze').checked = !!editing.snooze;
+  $('#vSnoozeMin').textContent = tf('minutes', editing.snooze_min);
+  $('#vRepeat').textContent = maskText(editing.mask);
+  $('#shDelete').hidden = !editing.id;
+  $('#sheet').hidden = false;
+  document.body.style.overflow = 'hidden';
+  buildWheel($('#wH'), 24, editing.h);
+  buildWheel($('#wM'), 60, editing.m);
+}
+
+function closeSheet() {
+  $('#sheet').hidden = true;
+  document.body.style.overflow = '';
   editing = null;
-  $('#dlg').close();
-  refresh();
-});
+}
 
-$('#addBtn').onclick = () => openDialog(null);
+$('#shCancel').onclick = closeSheet;
+$('#shSave').onclick = async () => {
+  const body = {
+    h: wheelValue($('#wH')), m: wheelValue($('#wM')),
+    mask: editing.mask, on: editing.on !== false,
+    label: $('#vLabel').value.slice(0, 9),
+    ring: editing.ring, snooze: $('#vSnooze').checked,
+    snooze_min: editing.snooze_min,
+  };
+  if (editing.id) await api(`/api/devices/${DEV}/alarms/${editing.id}`, {method: 'PUT', body: JSON.stringify(body)});
+  else await api(`/api/devices/${DEV}/alarms`, {method: 'POST', body: JSON.stringify(body)});
+  closeSheet(); refresh();
+};
+$('#shDelete').onclick = async () => {
+  if (!editing?.id) return;
+  await api(`/api/devices/${DEV}/alarms/${editing.id}`, {method: 'DELETE'});
+  closeSheet(); refresh();
+};
+$('#addBtn').onclick = () => openSheet(null);
 
+/* ---------------------------------------------------------------- pickers */
+function openPicker(title) {
+  $('#pkTitle').textContent = title;
+  $('#picker').hidden = false;
+}
+function closePicker() { $('#picker').hidden = true; }
+$('#pkClose').onclick = closePicker;
+
+$('#rRepeat').onclick = () => {
+  const body = $('#pkBody');
+  body.innerHTML = '';
+  for (const [mask, key] of PRESETS) {
+    const b = document.createElement('button');
+    b.className = 'row tap';
+    b.innerHTML = `<span>${t(key)}</span><b>${mask === editing.mask ? '✓' : ''}</b>`;
+    b.onclick = () => { editing.mask = mask; syncRepeat(); openPicker(t('repeat')); };
+    body.append(b);
+  }
+  const days = document.createElement('div');
+  days.className = 'days';
+  I18N[lang].days.forEach((d, i) => {
+    const c = document.createElement('button');
+    c.className = 'day' + (editing.mask & (1 << i) ? ' on' : '');
+    c.textContent = d;
+    c.onclick = () => {
+      editing.mask ^= (1 << i);
+      c.classList.toggle('on');
+      $('#vRepeat').textContent = maskText(editing.mask);
+      $$('#pkBody .row b').forEach((b, k) => {
+        b.textContent = PRESETS[k][0] === editing.mask ? '✓' : '';
+      });
+    };
+    days.append(c);
+  });
+  body.append(days);
+  const hint = document.createElement('p');
+  hint.className = 'hint';
+  hint.textContent = t('repeat_hint');
+  body.append(hint);
+  openPicker(t('repeat'));
+};
+
+$('#rRing').onclick = () => {
+  const body = $('#pkBody');
+  body.innerHTML = '';
+  for (const r of RINGS) {
+    const b = document.createElement('button');
+    b.className = 'row tap';
+    b.innerHTML = `<span>${ringText(r)}</span><b>${r === editing.ring ? '✓' : ''}</b>`;
+    b.onclick = () => { editing.ring = r; $('#vRing').textContent = ringText(r); closePicker(); };
+    body.append(b);
+  }
+  openPicker(t('ring'));
+};
+
+$('#rSnoozeMin').onclick = () => {
+  const body = $('#pkBody');
+  body.innerHTML = '';
+  for (const n of SNOOZE_MIN) {
+    const b = document.createElement('button');
+    b.className = 'row tap';
+    b.innerHTML = `<span>${tf('minutes', n)}</span><b>${n === editing.snooze_min ? '✓' : ''}</b>`;
+    b.onclick = () => { editing.snooze_min = n; $('#vSnoozeMin').textContent = tf('minutes', n); closePicker(); };
+    body.append(b);
+  }
+  openPicker(t('snooze_len'));
+};
+
+function syncRepeat() {
+  $('#vRepeat').textContent = maskText(editing.mask);
+  closePicker();
+}
+
+/* ---------------------------------------------------------------- devices */
 $('#lamp').onclick = async () => {
   await api(`/api/devices/${DEV}/cmd`, {method: 'POST',
     body: JSON.stringify({op: 'light.set', on: !state.light?.on})});
@@ -338,8 +472,7 @@ $('#tplus').onclick = () => bump(+1);
   try {
     settings = await api(`/api/devices/${DEV}/settings`);
     if (settings.lang === 'zh' || settings.lang === 'en') {
-      lang = settings.lang;
-      localStorage.setItem('lang', lang);
+      lang = settings.lang; localStorage.setItem('lang', lang);
     }
   } catch {}
   applyLang();

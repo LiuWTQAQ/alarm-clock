@@ -127,25 +127,55 @@
   </section>
 </main>
 
-<dialog id="dlg">
-  <form id="form">
-    <h3 id="dlgTitle">新增闹钟</h3>
-    <label><span data-i18n="time">时间</span><input id="fTime" type="time" required></label>
-    <label><span data-i18n="repeat">重复</span>
-      <select id="fMask">
-        <option value="31" data-i18n="r_work">工作日</option>
-        <option value="127" data-i18n="r_daily">每天</option>
-        <option value="96" data-i18n="r_weekend">周末</option>
-        <option value="0" data-i18n="r_once">一次</option>
-      </select>
-    </label>
-    <label><span data-i18n="label">标签</span><input id="fLabel" maxlength="9" placeholder="起床"></label>
-    <menu>
-      <button type="button" id="dlgCancel" class="ghost" data-i18n="cancel">取消</button>
-      <button type="submit" id="dlgSave" class="primary mini" data-i18n="save_short">保存</button>
-    </menu>
-  </form>
-</dialog>
+<!-- ------------------------------------------------ alarm sheet -->
+<div id="sheet" class="sheet" hidden>
+  <div class="panel">
+    <header class="head">
+      <button id="shCancel" class="circ" aria-label="cancel">✕</button>
+      <h3 id="shTitle">编辑闹钟</h3>
+      <button id="shSave" class="circ accent" aria-label="save">✓</button>
+    </header>
+
+    <div class="body">
+      <div class="wheel">
+        <div class="band"></div>
+        <div class="wcol" id="wH"></div>
+        <div class="wsep">:</div>
+        <div class="wcol" id="wM"></div>
+      </div>
+
+      <div class="group">
+        <button class="row tap" id="rRepeat"><span data-i18n="repeat">重复</span>
+          <b id="vRepeat">永不</b><i class="chev">›</i></button>
+      </div>
+      <p class="hint" id="repeatHint" data-i18n="repeat_hint"></p>
+
+      <div class="group">
+        <label class="row"><span data-i18n="label">标签</span>
+          <input id="vLabel" class="rin" maxlength="9" placeholder="闹钟"></label>
+        <button class="row tap" id="rRing"><span data-i18n="ring">铃声</span>
+          <b id="vRing">故事时间</b><i class="chev">›</i></button>
+        <div class="row"><span data-i18n="snooze">稍后提醒</span>
+          <label class="switch"><input type="checkbox" id="vSnooze" checked><span></span></label></div>
+        <button class="row tap" id="rSnoozeMin"><span data-i18n="snooze_len">稍后提醒时长</span>
+          <b id="vSnoozeMin">9 分钟</b><i class="chev">›</i></button>
+      </div>
+
+      <button class="row danger" id="shDelete" data-i18n="delete_alarm">删除闹钟</button>
+    </div>
+  </div>
+
+  <div id="picker" class="picker" hidden>
+    <div class="panel">
+      <header class="head">
+        <button id="pkClose" class="circ">✕</button>
+        <h3 id="pkTitle"></h3>
+        <span class="circ blank"></span>
+      </header>
+      <div class="body" id="pkBody"></div>
+    </div>
+  </div>
+</div>
 
 <script src="app.js"></script>
 </body>

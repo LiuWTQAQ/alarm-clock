@@ -47,6 +47,12 @@ def init():
             id INTEGER PRIMARY KEY AUTOINCREMENT, dev TEXT, ts INT, type TEXT, payload TEXT)""")
     db("""CREATE TABLE IF NOT EXISTS commands(
             id TEXT PRIMARY KEY, dev TEXT, op TEXT, payload TEXT, status TEXT, ts INT)""")
+    acols = [r["name"] for r in _conn.execute("PRAGMA table_info(alarms)").fetchall()]
+    for name, decl in (("snooze", "INTEGER DEFAULT 1"),
+                       ("snooze_min", "INTEGER DEFAULT 9"),
+                       ("ring", "TEXT DEFAULT '故事时间'")):
+        if name not in acols:
+            db(f"ALTER TABLE alarms ADD COLUMN {name} {decl}")
     cols = [r["name"] for r in _conn.execute("PRAGMA table_info(devices)").fetchall()]
     if "settings" not in cols:
         db("ALTER TABLE devices ADD COLUMN settings TEXT DEFAULT '{}'")
@@ -138,6 +144,9 @@ class AlarmIn(BaseModel):
     mask: int = 0
     on: bool = True
     label: str = ""
+    snooze: bool = True
+    snooze_min: int = 9
+    ring: str = "故事时间"
 
 
 # ---------------------------------------------------------------- REST
@@ -189,22 +198,25 @@ async def put_settings(dev: str, body: dict):
     return {"settings": cur, "pushed": changed}
 
 
+def alarm_row(r):
+    return {"id": r["id"], "h": r["h"], "m": r["m"], "mask": r["mask"],
+            "on": bool(r["on_"]), "label": r["label"],
+            "snooze": bool(r["snooze"]), "snooze_min": r["snooze_min"],
+            "ring": r["ring"]}
+
+
 @app.get("/api/devices/{dev}/alarms")
 def alarms(dev: str):
-    rows = db("SELECT id,h,m,mask,on_,label FROM alarms WHERE dev=? ORDER BY id",
-              (dev,)).fetchall()
-    return [{"id": r["id"], "h": r["h"], "m": r["m"], "mask": r["mask"],
-             "on": bool(r["on_"]), "label": r["label"]} for r in rows]
+    rows = db("SELECT * FROM alarms WHERE dev=? ORDER BY id", (dev,)).fetchall()
+    return [alarm_row(r) for r in rows]
 
 
 def _sync(dev: str):
     """Push the whole alarm table to the device and bump the revision."""
     rev = db("SELECT rev FROM devices WHERE id=?", (dev,)).fetchone()["rev"] + 1
     db("UPDATE devices SET rev=? WHERE id=?", (rev, dev))
-    rows = db("SELECT id,h,m,mask,on_,label FROM alarms WHERE dev=? ORDER BY id",
-              (dev,)).fetchall()
-    items = [{"id": r["id"], "h": r["h"], "m": r["m"], "mask": r["mask"],
-              "on": bool(r["on_"]), "label": r["label"]} for r in rows]
+    rows = db("SELECT * FROM alarms WHERE dev=? ORDER BY id", (dev,)).fetchall()
+    items = [alarm_row(r) for r in rows]
     cmd = {"id": str(uuid.uuid4()), "op": "alarm.sync", "ts": int(time.time()),
            "rev": rev, "alarms": items}
     db("INSERT INTO commands VALUES(?,?,?,?,?,?)",
@@ -216,15 +228,19 @@ def _sync(dev: str):
 @app.post("/api/devices/{dev}/alarms")
 def alarm_add(dev: str, a: AlarmIn):
     nxt = db("SELECT COALESCE(MAX(id),0)+1 n FROM alarms WHERE dev=?", (dev,)).fetchone()["n"]
-    db("INSERT INTO alarms VALUES(?,?,?,?,?,?,?)",
-       (dev, nxt, a.h % 24, a.m % 60, a.mask, 1 if a.on else 0, a.label[:9]))
+    db("INSERT INTO alarms(dev,id,h,m,mask,on_,label,snooze,snooze_min,ring) "
+       "VALUES(?,?,?,?,?,?,?,?,?,?)",
+       (dev, nxt, a.h % 24, a.m % 60, a.mask, 1 if a.on else 0, a.label[:9],
+        1 if a.snooze else 0, max(1, min(30, a.snooze_min)), a.ring[:12]))
     return {"id": nxt, "rev": _sync(dev)}
 
 
 @app.put("/api/devices/{dev}/alarms/{aid}")
 def alarm_update(dev: str, aid: int, a: AlarmIn):
-    db("UPDATE alarms SET h=?,m=?,mask=?,on_=?,label=? WHERE dev=? AND id=?",
-       (a.h % 24, a.m % 60, a.mask, 1 if a.on else 0, a.label[:9], dev, aid))
+    db("UPDATE alarms SET h=?,m=?,mask=?,on_=?,label=?,snooze=?,snooze_min=?,ring=? "
+       "WHERE dev=? AND id=?",
+       (a.h % 24, a.m % 60, a.mask, 1 if a.on else 0, a.label[:9],
+        1 if a.snooze else 0, max(1, min(30, a.snooze_min)), a.ring[:12], dev, aid))
     return {"rev": _sync(dev)}
 
 
