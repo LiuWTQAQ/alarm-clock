@@ -5,7 +5,7 @@ const $$ = s => [...document.querySelectorAll(s)];
 /* ---------------------------------------------------------------- i18n */
 const I18N = {
   zh: {
-    title:'闹钟 · 远程控制', tab_home:'主页', tab_settings:'设置',
+    title:'闹钟 · 远程控制', tab_home:'主页', tab_settings:'设置', logout:'退出',
     connecting:'连接中…', online:(r)=>`在线 · 信号 ${r} dBm`, offline:'离线（使用本地闹钟）',
     down:'服务未启动', air:(n)=>`空气 ${n}`,
     lamp:'灯', lamp_hint:'继电器 · 卧室顶灯', ac:'空调', ac_hint:'红外 · 房间空调',
@@ -29,7 +29,7 @@ const I18N = {
     rings:{'故事时间':'故事时间','清晨':'清晨','鸟鸣':'鸟鸣','经典':'经典','渐强':'渐强'},
   },
   en: {
-    title:'Alarm Clock · Remote', tab_home:'Home', tab_settings:'Settings',
+    title:'Alarm Clock · Remote', tab_home:'Home', tab_settings:'Settings', logout:'Sign out',
     connecting:'Connecting…', online:(r)=>`Online · ${r} dBm`, offline:'Offline (local alarms)',
     down:'Service unavailable', air:(n)=>`AQI ${n}`,
     lamp:'Light', lamp_hint:'Relay · bedroom ceiling light', ac:'AC', ac_hint:'IR · room air conditioner',
@@ -140,8 +140,17 @@ function maskText(m) {
 
 async function api(path, opts = {}) {
   const r = await fetch(path, {headers: {'Content-Type': 'application/json'}, ...opts});
+  if (r.status === 401) { location.replace('/login.html'); throw new Error('unauthorized'); }
   if (!r.ok) throw new Error(`${r.status} ${path}`);
   return r.json();
+}
+
+async function guard() {
+  try {
+    const r = await fetch('/api/me');
+    if (!r.ok) { location.replace('/login.html'); return false; }
+    return true;
+  } catch { location.replace('/login.html'); return false; }
 }
 
 /* ---------------------------------------------------------------- i18n apply */
@@ -467,8 +476,14 @@ const bump = async d => {
 $('#tmin').onclick = () => bump(-1);
 $('#tplus').onclick = () => bump(+1);
 
+$('#logout')?.addEventListener('click', async () => {
+  try { await fetch('/api/logout', {method: 'POST'}); } catch {}
+  location.replace('/login.html');
+});
+
 /* ---------------------------------------------------------------- boot */
 (async function boot() {
+  if (!await guard()) return;
   try {
     settings = await api(`/api/devices/${DEV}/settings`);
     if (settings.lang === 'zh' || settings.lang === 'en') {

@@ -7,11 +7,11 @@ Transport: when MQTT_URL is set the service talks real MQTT (EMQX on the
 Tencent Cloud host); without it the service runs an in-process bus so the
 web UI and tools/sim_device.py can be exercised on a laptop.
 """
-import json, os, sqlite3, threading, time, uuid
+import hashlib, hmac, json, os, secrets, sqlite3, threading, time, uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -21,7 +21,16 @@ DB = Path(os.environ.get("ALARM_DB", ROOT / "server" / "data.db"))
 MQTT_URL = os.environ.get("MQTT_URL", "")
 DEV = "a943f8"                      # the only device for now
 
-app = FastAPI(title="Alarm Clock API")
+AUTH_USER = os.environ.get("ALARM_USER", "LiuWT")
+AUTH_PASS = os.environ.get("ALARM_PASS", "L0219")
+SESSION_TTL = 7 * 24 * 3600
+COOKIE = "sid"
+
+_PROD = os.environ.get("ALARM_PROD") == "1"
+app = FastAPI(title="Alarm Clock API",
+              docs_url=None if _PROD else "/docs",
+              redoc_url=None if _PROD else "/redoc",
+              openapi_url=None if _PROD else "/openapi.json")
 _lock = threading.Lock()
 _conn = sqlite3.connect(DB, check_same_thread=False)
 _conn.row_factory = sqlite3.Row
@@ -56,12 +65,63 @@ def init():
     cols = [r["name"] for r in _conn.execute("PRAGMA table_info(devices)").fetchall()]
     if "settings" not in cols:
         db("ALTER TABLE devices ADD COLUMN settings TEXT DEFAULT '{}'")
+    db("""CREATE TABLE IF NOT EXISTS users(
+            user TEXT PRIMARY KEY, salt TEXT, pw TEXT)""")
+    db("""CREATE TABLE IF NOT EXISTS sessions(
+            token TEXT PRIMARY KEY, user TEXT, ts INT)""")
+    if not _conn.execute("SELECT 1 FROM users WHERE user=?", (AUTH_USER,)).fetchone():
+        salt = secrets.token_hex(16)
+        db("INSERT INTO users(user,salt,pw) VALUES(?,?,?)",
+           (AUTH_USER, salt, hash_pw(AUTH_PASS, salt)))
+
     if not _conn.execute("SELECT 1 FROM devices WHERE id=?", (DEV,)).fetchone():
         db("INSERT INTO devices(id,name,online,rev,state,last_seen) VALUES(?,?,0,0,?,0)",
            (DEV, "卧室闹钟", "{}"))
         for i, (h, m, mask, on, label) in enumerate(
                 [(7, 30, 0x1F, 1, "起床"), (8, 10, 0x60, 0, "周末")], start=1):
             db("INSERT INTO alarms VALUES(?,?,?,?,?,?,?)", (DEV, i, h, m, mask, on, label))
+
+
+# ---------------------------------------------------------------- auth
+def hash_pw(pw: str, salt: str) -> str:
+    return hashlib.pbkdf2_hmac("sha256", pw.encode(), bytes.fromhex(salt), 120_000).hex()
+
+
+def check_login(user: str, pw: str) -> bool:
+    row = _conn.execute("SELECT salt,pw FROM users WHERE user=?", (user,)).fetchone()
+    if not row:
+        hmac.compare_digest(hash_pw(pw, "00" * 16), hash_pw(pw, "00" * 16))
+        return False
+    return hmac.compare_digest(hash_pw(pw, row["salt"]), row["pw"])
+
+
+def new_session(user: str) -> str:
+    tok = secrets.token_urlsafe(32)
+    db("INSERT INTO sessions(token,user,ts) VALUES(?,?,?)", (tok, user, int(time.time())))
+    db("DELETE FROM sessions WHERE ts < ?", (int(time.time()) - SESSION_TTL,))
+    return tok
+
+
+def current_user(request: Request) -> Optional[str]:
+    tok = request.cookies.get(COOKIE)
+    if not tok:
+        return None
+    row = _conn.execute("SELECT user,ts FROM sessions WHERE token=?", (tok,)).fetchone()
+    if not row or row["ts"] < int(time.time()) - SESSION_TTL:
+        return None
+    return row["user"]
+
+
+PUBLIC = {"/api/login", "/api/health"}
+
+
+@app.middleware("http")
+async def auth_guard(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api/") and path not in PUBLIC:
+        if not current_user(request):
+            return JSONResponse({"detail": "unauthorized"}, status_code=401)
+    return await call_next(request)
 
 
 # ---------------------------------------------------------------- transport
@@ -147,6 +207,54 @@ class AlarmIn(BaseModel):
     snooze: bool = True
     snooze_min: int = 9
     ring: str = "故事时间"
+
+
+# ---------------------------------------------------------------- auth routes
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+
+_fails: dict[str, list] = {}
+
+
+@app.post("/api/login")
+def login(body: LoginIn, request: Request):
+    ip = request.client.host if request.client else "?"
+    now = time.time()
+    hits = [t for t in _fails.get(ip, []) if now - t < 300]
+    if len(hits) >= 8:
+        raise HTTPException(429, "尝试次数过多，请 5 分钟后再试")
+    if not check_login(body.username, body.password):
+        hits.append(now)
+        _fails[ip] = hits
+        raise HTTPException(401, "用户名或密码不正确")
+    _fails.pop(ip, None)
+    tok = new_session(body.username)
+    resp = JSONResponse({"ok": True, "user": body.username})
+    resp.set_cookie(COOKIE, tok, max_age=SESSION_TTL, httponly=True, samesite="lax",
+                    secure=request.headers.get("x-forwarded-proto") == "https")
+    return resp
+
+
+@app.post("/api/logout")
+def logout(request: Request):
+    tok = request.cookies.get(COOKIE)
+    if tok:
+        db("DELETE FROM sessions WHERE token=?", (tok,))
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(COOKIE)
+    return resp
+
+
+@app.get("/api/me")
+def me(request: Request):
+    return {"user": current_user(request)}
+
+
+@app.get("/api/health")
+def health():
+    return {"ok": True, "ts": int(time.time())}
 
 
 # ---------------------------------------------------------------- REST

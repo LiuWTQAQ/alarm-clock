@@ -9,7 +9,11 @@ User=alarm
 Group=alarm
 WorkingDirectory=/opt/alarm/current
 Environment=PORT=8001
-Environment=MQTT_URL=mqtt://127.0.0.1:1883
+Environment=ALARM_PROD=1
+# 生产环境务必改掉默认密码：
+# Environment=ALARM_PASS=换成你的强密码
+# 装好 mosquitto 后再取消下面这行注释；当前用进程内总线（单进程单 worker）
+# Environment=MQTT_URL=mqtt://127.0.0.1:1883
 ExecStart=/opt/alarm/venv/bin/uvicorn server.app:app --host 127.0.0.1 --port 8001 --workers 1 --proxy-headers
 Restart=always
 RestartSec=3

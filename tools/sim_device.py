@@ -5,17 +5,40 @@ state every 2 s and can fire an alarm event.
     python3 tools/sim_device.py            # runs against localhost:8000
     python3 tools/sim_device.py --fire 1   # emit an alarm.fire event now
 """
-import argparse, json, time, urllib.request
+import argparse, http.cookiejar, json, os, time, urllib.error, urllib.request
 
 DEV = "a943f8"
+USER = os.environ.get("ALARM_USER", "LiuWT")
+PASS = os.environ.get("ALARM_PASS", "L0219")
+
+_jar = http.cookiejar.CookieJar()
+_opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(_jar))
+_logged: dict = {"base": None}
 
 
-def call(base, path, payload=None, method="GET"):
+def login(base):
+    body = json.dumps({"username": USER, "password": PASS}).encode()
+    req = urllib.request.Request(base + "/api/login", data=body, method="POST",
+                                 headers={"Content-Type": "application/json"})
+    with _opener.open(req, timeout=5) as r:
+        r.read()
+    _logged["base"] = base
+
+
+def call(base, path, payload=None, method="GET", retry=True):
+    if _logged["base"] != base:
+        login(base)
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(base + path, data=data, method=method,
                                  headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=5) as r:
-        return json.loads(r.read() or b"{}")
+    try:
+        with _opener.open(req, timeout=5) as r:
+            return json.loads(r.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        if e.code == 401 and retry:
+            login(base)
+            return call(base, path, payload, method, retry=False)
+        raise
 
 
 class Device:
