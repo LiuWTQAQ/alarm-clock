@@ -28,19 +28,25 @@ def parse(text: str):
     if not t:
         return None
 
+    # 「空调开着吗 / 灯关了吗」是询问，不是动作
+    if re.search(r"(空调|冷气|灯).{0,6}(吗|么)", t) or re.search(r"(开|关)着", t):
+        return "query.device", {"target": "ac" if re.search("空调|冷气", t) else "light"}, None
     if re.search(r"(关|闭|灭).{0,3}(灯|台灯|顶灯)", t) or re.search(r"(灯).{0,2}(关|灭)", t):
         return "light.off", {}, "好的，已关灯"
     if re.search(r"(开|亮).{0,3}(灯|台灯|顶灯)", t) or re.search(r"(灯).{0,2}(开|亮)", t):
         return "light.on", {}, "好的，已开灯"
 
-    m = re.search(r"(空调|冷气).{0,6}?(\d{2}|[一二两三四五六七八九]?十[一二三四五六七八九]?|[零一二两三四五六七八九])度", t)
+    m = re.search(r"(?:空调|冷气)[^0-9一二两三四五六七八九十]{0,6}"
+                  r"(\d{1,2}|[零一二两三四五六七八九十]{1,3})\s*(?:度|°|℃|摄氏度)", t)
+    if not m:                      # 「调到 26」这种省略单位的说法
+        m = re.search(r"调到\s*(\d{1,2})", t)
     if m:
-        n = _num(m.group(2))
+        n = _num(m.group(1))
         if n and 16 <= n <= 30:
             return "ac.temp", {"value": n}, f"好的，空调调到 {n} 度"
-    if re.search(r"(关|闭).{0,3}(空调|冷气)", t):
+    if re.search(r"(关|闭|停).{0,4}(空调|冷气)", t) or re.search(r"(空调|冷气).{0,4}(关|闭|停)", t):
         return "ac.off", {}, "好的，已关空调"
-    if re.search(r"(开|启动).{0,3}(空调|冷气)", t):
+    if re.search(r"(开|启动).{0,4}(空调|冷气)", t) or re.search(r"(空调|冷气).{0,4}(开|启动)", t):
         return "ac.on", {}, "好的，已开空调"
 
     if re.search(r"(几点|时间|现在什么时候)", t):

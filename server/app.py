@@ -396,6 +396,14 @@ async def voice(request: Request, dev: str = DEV, execute: bool = True):
         out["reply"] = "没听懂，请再说一遍"
         return out
     intent, params, reply = parsed
+    if intent == "query.device" and not reply:
+        row = db("SELECT state FROM devices WHERE id=?", (dev,)).fetchone()
+        st = json.loads(row["state"]) if row and row["state"] else {}
+        if params.get("target") == "light":
+            reply = "灯是开着的" if (st.get("light") or {}).get("on") else "灯是关着的"
+        else:
+            ac = st.get("ac") or {}
+            reply = (f"空调开着，{ac.get('temp', 26)} 度" if ac.get("on") else "空调是关着的")
     if intent == "query.time" and not reply:
         reply = time.strftime("现在是 %H:%M", time.localtime())
     elif intent == "query.weather" and not reply:
